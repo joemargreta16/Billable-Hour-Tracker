@@ -11,7 +11,16 @@
                 <i data-feather="plus" class="me-1"></i>Add Entry
             </a>
         </div>
-        <p class="text-muted">{{ cycle_name }}</p>
+        <div class="d-flex justify-content-between align-items-center">
+            <p class="text-muted">{{ cycle_name }}</p>
+            <form method="GET" action="{{ url_for('dashboard') }}">
+                <select name="cycle" class="form-select form-select-sm" onchange="this.form.submit()">
+                    {% for cycle in available_cycles %}
+                        <option value="{{ cycle.start_date.strftime('%Y-%m-%d') }}" {% if cycle.start_date == start_date %}selected{% endif %}>{{ cycle.name }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -82,15 +91,7 @@
         </div>
     </div>
     <div class="col-lg-4 mb-3">
-        <div class="card">
-            <div class="card-body text-center">
-                <h6 class="card-title">Progress Chart</h6>
-                <canvas id="progressChart" width="200" height="200"></canvas>
-                <div class="mt-2">
-                    <small class="text-muted">Goal Achievement</small>
-                </div>
-            </div>
-        </div>
+
     </div>
 </div>
 

@@ -18,8 +18,16 @@ import io
 @app.route('/')
 def dashboard():
     """Main dashboard showing current cycle statistics"""
-    # Get current monthly cycle
-    start_date, end_date, cycle_name = get_current_monthly_cycle()
+    cycle_date_str = request.args.get('cycle')
+    if cycle_date_str:
+        try:
+            target_date = datetime.strptime(cycle_date_str, '%Y-%m-%d').date()
+            start_date, end_date, cycle_name = get_monthly_cycle_for_date(target_date)
+        except ValueError:
+            flash('Invalid date format', 'error')
+            return redirect(url_for('dashboard'))
+    else:
+        start_date, end_date, cycle_name = get_current_monthly_cycle()
     
     # Get monthly goal
     monthly_goal = float(get_setting('monthly_goal_hours', '160'))
@@ -62,6 +70,8 @@ def dashboard():
     days_completed = (date.today() - start_date).days + 1 if date.today() >= start_date else 0
     days_completed = min(days_completed, total_days)
     
+    available_cycles = get_previous_cycles(12)
+
     return render_template('dashboard.html',
                          cycle_name=cycle_name,
                          start_date=start_date,
@@ -74,7 +84,8 @@ def dashboard():
                          daily_totals=daily_totals,
                          days_completed=days_completed,
                          total_days=total_days,
-                         decimal_to_hours_minutes=decimal_to_hours_minutes)
+                         decimal_to_hours_minutes=decimal_to_hours_minutes,
+                         available_cycles=available_cycles)
 
 @app.route('/entries')
 @app.route('/entries/<cycle_date>')

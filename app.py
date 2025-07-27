@@ -32,5 +32,17 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 db.init_app(app)
 migrate.init_app(app, db)
 
+
 # Import routes
 import routes
+
+@app.cli.command("init-db")
+def init_db_command():
+    """Initializes the database."""
+    import models
+    db.create_all()
+    models.initialize_default_data()
+    print("Database initialized.")
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
