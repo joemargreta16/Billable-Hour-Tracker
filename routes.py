@@ -336,6 +336,52 @@ def add_project():
     
     return redirect(url_for('settings'))
 
+@app.route('/delete_project/<int:project_id>', methods=['POST'])
+def delete_project(project_id):
+    """Delete a project and its associated time entries"""
+    project = Project.query.get_or_404(project_id)
+
+    try:
+        # The 'delete-orphan' cascade will handle deleting associated time entries
+        db.session.delete(project)
+        db.session.commit()
+        flash(f'Project "{project.name}" and all its time entries have been deleted.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting project: {str(e)}', 'error')
+
+    return redirect(url_for('settings'))
+
+@app.route('/edit_project/<int:project_id>', methods=['POST'])
+def edit_project(project_id):
+    """Edit an existing project"""
+    project = Project.query.get_or_404(project_id)
+
+    name = request.form.get('name', '').strip()
+    description = request.form.get('description', '').strip()
+
+    if not name:
+        flash('Project name is required', 'error')
+        return redirect(url_for('settings'))
+
+    # Check if another project with the same name already exists
+    existing_project = Project.query.filter(Project.name == name, Project.id != project_id).first()
+    if existing_project:
+        flash('A project with this name already exists', 'error')
+        return redirect(url_for('settings'))
+
+    try:
+        project.name = name
+        project.description = description
+        project.updated_at = datetime.utcnow()
+        db.session.commit()
+        flash(f'Project "{name}" updated successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating project: {str(e)}', 'error')
+
+    return redirect(url_for('settings'))
+
 @app.route('/export')
 def export_page():
     """Export data page"""

@@ -9,6 +9,7 @@ class Project(db.Model):
     description = db.Column(db.String(255))
     active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationship to time entries
     time_entries = db.relationship('TimeEntry', backref='project', lazy=True, cascade='all, delete-orphan')
