@@ -4,6 +4,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
+from flask_migrate import Migrate
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -12,6 +13,7 @@ class Base(DeclarativeBase):
     pass
 
 db = SQLAlchemy(model_class=Base)
+migrate = Migrate()
 
 # Create the app
 app = Flask(__name__)
@@ -28,17 +30,19 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 
 # Initialize the app with the extension
 db.init_app(app)
+migrate.init_app(app, db)
 
-with app.app_context():
-    # Import models to ensure tables are created
-    import models
-    db.create_all()
-    
-    # Initialize default data
-    models.initialize_default_data()
 
 # Import routes
 import routes
+
+@app.cli.command("init-db")
+def init_db_command():
+    """Initializes the database."""
+    import models
+    db.create_all()
+    models.initialize_default_data()
+    print("Database initialized.")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

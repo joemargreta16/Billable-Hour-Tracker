@@ -18,8 +18,16 @@ import io
 @app.route('/')
 def dashboard():
     """Main dashboard showing current cycle statistics"""
-    # Get current monthly cycle
-    start_date, end_date, cycle_name = get_current_monthly_cycle()
+    cycle_date_str = request.args.get('cycle')
+    if cycle_date_str:
+        try:
+            target_date = datetime.strptime(cycle_date_str, '%Y-%m-%d').date()
+            start_date, end_date, cycle_name = get_monthly_cycle_for_date(target_date)
+        except ValueError:
+            flash('Invalid date format', 'error')
+            return redirect(url_for('dashboard'))
+    else:
+        start_date, end_date, cycle_name = get_current_monthly_cycle()
     
     # Get monthly goal
     monthly_goal = float(get_setting('monthly_goal_hours', '160'))
@@ -62,6 +70,8 @@ def dashboard():
     days_completed = (date.today() - start_date).days + 1 if date.today() >= start_date else 0
     days_completed = min(days_completed, total_days)
     
+    available_cycles = get_previous_cycles(12)
+
     return render_template('dashboard.html',
                          cycle_name=cycle_name,
                          start_date=start_date,
@@ -74,7 +84,8 @@ def dashboard():
                          daily_totals=daily_totals,
                          days_completed=days_completed,
                          total_days=total_days,
-                         decimal_to_hours_minutes=decimal_to_hours_minutes)
+                         decimal_to_hours_minutes=decimal_to_hours_minutes,
+                         available_cycles=available_cycles)
 
 @app.route('/entries')
 @app.route('/entries/<cycle_date>')
@@ -334,6 +345,52 @@ def add_project():
         db.session.rollback()
         flash(f'Error adding project: {str(e)}', 'error')
     
+    return redirect(url_for('settings'))
+
+@app.route('/delete_project/<int:project_id>', methods=['POST'])
+def delete_project(project_id):
+    """Delete a project and its associated time entries"""
+    project = Project.query.get_or_404(project_id)
+
+    try:
+        # The 'delete-orphan' cascade will handle deleting associated time entries
+        db.session.delete(project)
+        db.session.commit()
+        flash(f'Project "{project.name}" and all its time entries have been deleted.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting project: {str(e)}', 'error')
+
+    return redirect(url_for('settings'))
+
+@app.route('/edit_project/<int:project_id>', methods=['POST'])
+def edit_project(project_id):
+    """Edit an existing project"""
+    project = Project.query.get_or_404(project_id)
+
+    name = request.form.get('name', '').strip()
+    description = request.form.get('description', '').strip()
+
+    if not name:
+        flash('Project name is required', 'error')
+        return redirect(url_for('settings'))
+
+    # Check if another project with the same name already exists
+    existing_project = Project.query.filter(Project.name == name, Project.id != project_id).first()
+    if existing_project:
+        flash('A project with this name already exists', 'error')
+        return redirect(url_for('settings'))
+
+    try:
+        project.name = name
+        project.description = description
+        project.updated_at = datetime.utcnow()
+        db.session.commit()
+        flash(f'Project "{name}" updated successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating project: {str(e)}', 'error')
+
     return redirect(url_for('settings'))
 
 @app.route('/export')
