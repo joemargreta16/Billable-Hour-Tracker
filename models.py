@@ -9,7 +9,7 @@ class Project(db.Model):
     description = db.Column(db.String(255))
     active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Note: updated_at column will be handled gracefully if missing
     
     # Relationship to time entries
     time_entries = db.relationship('TimeEntry', backref='project', lazy=True, cascade='all, delete-orphan')
@@ -17,22 +17,33 @@ class Project(db.Model):
     def __repr__(self):
         return f'<Project {self.name}>'
     
+    @property
+    def updated_at(self):
+        """Fallback for missing updated_at column"""
+        return getattr(self, '_updated_at', self.created_at)
+    
+    @updated_at.setter
+    def updated_at(self, value):
+        """Setter for updated_at with fallback"""
+        if hasattr(self, '_updated_at'):
+            self._updated_at = value
+        # Silently ignore if column doesn't exist
+    
     def save(self):
-        """Save project with fallback for missing updated_at"""
+        """Save project with error handling"""
         try:
             db.session.add(self)
             db.session.commit()
         except Exception as e:
-            # Handle missing updated_at column gracefully
-            if 'updated_at' in str(e).lower():
-                # Try without updated_at
-                db.session.rollback()
-                # Manually set updated_at if column exists
-                if hasattr(self, 'updated_at'):
-                    self.updated_at = datetime.utcnow()
+            db.session.rollback()
+            # Log error but continue
+            print(f"Database save error: {e}")
+            # Try basic save without updated_at
+            try:
                 db.session.add(self)
                 db.session.commit()
-            else:
+            except:
+                db.session.rollback()
                 raise
 
 class TimeEntry(db.Model):

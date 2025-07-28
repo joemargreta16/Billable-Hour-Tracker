@@ -87,7 +87,7 @@
                                     </div>
                                     <div class="d-flex align-items-center mb-1">
                                         <i data-feather="folder" class="me-2 text-muted" style="width: 1rem; height: 1rem;"></i>
-                                        <span>{{ entry.project.name }}</span>
+                                        <span>{{ entry.project.name if entry.project else 'No Project' }}</span>
                                     </div>
                                     {% if entry.description %}
                                         <div class="text-muted small">{{ entry.description }}</div>
