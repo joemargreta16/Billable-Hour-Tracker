@@ -16,6 +16,24 @@ class Project(db.Model):
     
     def __repr__(self):
         return f'<Project {self.name}>'
+    
+    def save(self):
+        """Save project with fallback for missing updated_at"""
+        try:
+            db.session.add(self)
+            db.session.commit()
+        except Exception as e:
+            # Handle missing updated_at column gracefully
+            if 'updated_at' in str(e).lower():
+                # Try without updated_at
+                db.session.rollback()
+                # Manually set updated_at if column exists
+                if hasattr(self, 'updated_at'):
+                    self.updated_at = datetime.utcnow()
+                db.session.add(self)
+                db.session.commit()
+            else:
+                raise
 
 class TimeEntry(db.Model):
     """Model for storing time entry records"""

@@ -684,17 +684,19 @@ def edit_project_page(project_id):
             flash('A project with this name already exists.', 'error')
             return redirect(url_for('edit_project_page', project_id=project_id))
         
-        try:
-            project.name = name
-            project.description = description
+    try:
+        project.name = name
+        project.description = description
+        # Handle missing updated_at column gracefully
+        if hasattr(project, 'updated_at'):
             project.updated_at = datetime.utcnow()
-            db.session.commit()
-            flash('Project updated successfully!', 'success')
-            return redirect(url_for('projects'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error updating project: {str(e)}', 'error')
-            return redirect(url_for('edit_project_page', project_id=project_id))
+        db.session.commit()
+        flash('Project updated successfully!', 'success')
+        return redirect(url_for('projects'))
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating project: {str(e)}', 'error')
+        return redirect(url_for('edit_project_page', project_id=project_id))
     
     return render_template('edit_project.html', project=project)
 
