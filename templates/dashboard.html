@@ -13,12 +13,10 @@
         </div>
         <div class="d-flex justify-content-between align-items-center">
             <p class="text-muted">{{ cycle_name }}</p>
-            <form method="GET" action="{{ url_for('dashboard') }}">
-                <select name="cycle" class="form-select form-select-sm" onchange="this.form.submit()">
-                    {% for cycle in available_cycles %}
-                        <option value="{{ cycle.start_date.strftime('%Y-%m-%d') }}" {% if cycle.start_date == start_date %}selected{% endif %}>{{ cycle.name }}</option>
-                    {% endfor %}
-                </select>
+            <form method="GET" action="{{ url_for('dashboard') }}" class="d-flex align-items-center gap-2">
+                <label for="month-filter" class="form-label mb-0 text-muted">Filter by Month:</label>
+                <input type="month" id="month-filter" name="month" class="form-control form-control-sm" 
+                       value="{{ current_month }}" onchange="this.form.submit()" style="width: auto;">
             </form>
         </div>
     </div>
@@ -64,34 +62,6 @@
                 <small class="text-muted">Progress</small>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- Progress Visualization -->
-<div class="row mb-4">
-    <div class="col-lg-8 mb-3">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Monthly Progress</h5>
-                <div class="progress mb-2" style="height: 1.5rem;">
-                    <div class="progress-bar {% if progress_percentage >= 100 %}bg-success{% elif progress_percentage >= 75 %}bg-info{% elif progress_percentage >= 50 %}bg-warning{% else %}bg-primary{% endif %}" 
-                         role="progressbar" 
-                         style="width: {{ progress_percentage }}%"
-                         aria-valuenow="{{ progress_percentage }}" 
-                         aria-valuemin="0" 
-                         aria-valuemax="100">
-                         {{ "%.0f"|format(progress_percentage) }}%
-                    </div>
-                </div>
-                <div class="d-flex justify-content-between text-muted small">
-                    <span>{{ decimal_to_hours_minutes(total_hours) }} of {{ decimal_to_hours_minutes(monthly_goal) }} hours</span>
-                    <span>Day {{ days_completed }} of {{ total_days }}</span>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-4 mb-3">
-
     </div>
 </div>
 
@@ -200,49 +170,8 @@
         feather.replace();
         
         // Initialize charts
-        initializeProgressChart();
         initializeDailyChart();
     });
-    
-    function initializeProgressChart() {
-        const ctx = document.getElementById('progressChart');
-        if (!ctx) return;
-        
-        const progressData = {{ progress_percentage }};
-        const remainingData = Math.max(0, 100 - progressData);
-        
-        new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Completed', 'Remaining'],
-                datasets: [{
-                    data: [progressData, remainingData],
-                    backgroundColor: [
-                        {% if progress_percentage >= 100 %}'#198754'{% elif progress_percentage >= 75 %}'#0dcaf0'{% elif progress_percentage >= 50 %}'#ffc107'{% else %}'#0d6efd'{% endif %},
-                        '#6c757d'
-                    ],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return context.label + ': ' + Math.round(context.raw) + '%';
-                            }
-                        }
-                    }
-                },
-                cutout: '70%'
-            }
-        });
-    }
     
     function initializeDailyChart() {
         const ctx = document.getElementById('dailyChart');

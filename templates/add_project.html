@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Add Project - Time Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="mb-0">Add New Project</h1>
+            <a href="{{ url_for('projects') }}" class="btn btn-outline-secondary">
+                <i data-feather="arrow-left" class="me-1"></i>Back to Projects
+            </a>
+        </div>
+        <p class="text-muted">Create a new project for time tracking</p>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Project Details</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Project Name <span class="text-danger">*</span></label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="name" 
+                               name="name" 
+                               required 
+                               maxlength="100"
+                               placeholder="Enter project name">
+                        <div class="form-text">Choose a unique, descriptive name for your project.</div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" 
+                                  id="description" 
+                                  name="description" 
+                                  rows="3" 
+                                  maxlength="255"
+                                  placeholder="Enter project description (optional)"></textarea>
+                        <div class="form-text">Provide additional details about this project.</div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('projects') }}" class="btn btn-outline-secondary">
+                            <i data-feather="x" class="me-1"></i>Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i data-feather="plus" class="me-1"></i>Create Project
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Help Card -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0">Tips for Creating Projects</h6>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li><strong>Be Descriptive:</strong> Use clear, meaningful names that help you identify the project quickly.</li>
+                    <li><strong>Stay Organized:</strong> Consider using prefixes like "Client A -" or "Internal -" to group related projects.</li>
+                    <li><strong>Add Context:</strong> Use the description field to provide additional context about the project scope or client.</li>
+                    <li><strong>Keep It Simple:</strong> Avoid overly long names that might be hard to read in reports and dropdowns.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        feather.replace();
+        
+        // Focus on the name field
+        document.getElementById('name').focus();
+        
+        // Character counter for description
+        const descriptionField = document.getElementById('description');
+        const maxLength = 255;
+        
+        function updateCharCount() {
+            const remaining = maxLength - descriptionField.value.length;
+            const formText = descriptionField.nextElementSibling;
+            formText.textContent = `${remaining} characters remaining. Provide additional details about this project.`;
+            
+            if (remaining < 50) {
+                formText.classList.add('text-warning');
+            } else {
+                formText.classList.remove('text-warning');
+            }
+        }
+        
+        descriptionField.addEventListener('input', updateCharCount);
+        updateCharCount(); // Initial call
+        
+        // Form validation
+        const form = document.querySelector('form');
+        const nameField = document.getElementById('name');
+        
+        form.addEventListener('submit', function(e) {
+            const name = nameField.value.trim();
+            if (!name) {
+                e.preventDefault();
+                nameField.focus();
+                nameField.classList.add('is-invalid');
+                
+                // Remove invalid class after user starts typing
+                nameField.addEventListener('input', function() {
+                    nameField.classList.remove('is-invalid');
+                }, { once: true });
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -122,20 +122,26 @@ def decimal_to_hours_minutes(decimal_hours):
 def get_previous_cycles(num_cycles=12):
     """
     Get a list of previous monthly cycles for navigation.
-    Returns list of tuples (start_date, end_date, cycle_name)
+    Returns list of objects with start_date, end_date, and name attributes
     """
+    class Cycle:
+        def __init__(self, start_date, end_date, name):
+            self.start_date = start_date
+            self.end_date = end_date
+            self.name = name
+    
     cycles = []
     current_start, current_end, current_name = get_current_monthly_cycle()
     
     # Add current cycle
-    cycles.append((current_start, current_end, current_name))
+    cycles.append(Cycle(current_start, current_end, current_name))
     
     # Add previous cycles
     for i in range(1, num_cycles):
         # Go back one cycle at a time
         prev_start = current_start - timedelta(days=1)  # Day before current start
         prev_start, prev_end, prev_name = get_monthly_cycle_for_date(prev_start)
-        cycles.append((prev_start, prev_end, prev_name))
+        cycles.append(Cycle(prev_start, prev_end, prev_name))
         current_start = prev_start
     
     return cycles

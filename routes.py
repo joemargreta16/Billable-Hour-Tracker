@@ -17,14 +17,15 @@ import io
 
 @app.route('/')
 def dashboard():
-    """Main dashboard showing current cycle statistics"""
-    cycle_date_str = request.args.get('cycle')
-    if cycle_date_str:
+    """Main dashboard showing current cycle statistics with monthly filter"""
+    month_param = request.args.get('month')
+    if month_param:
         try:
-            target_date = datetime.strptime(cycle_date_str, '%Y-%m-%d').date()
+            # Convert month (YYYY-MM) to a date (we use the first day of the month)
+            target_date = datetime.strptime(month_param + '-01', '%Y-%m-%d').date()
             start_date, end_date, cycle_name = get_monthly_cycle_for_date(target_date)
         except ValueError:
-            flash('Invalid date format', 'error')
+            flash('Invalid month format. Please use YYYY-MM.', 'error')
             return redirect(url_for('dashboard'))
     else:
         start_date, end_date, cycle_name = get_current_monthly_cycle()
@@ -71,6 +72,9 @@ def dashboard():
     days_completed = min(days_completed, total_days)
     
     available_cycles = get_previous_cycles(12)
+    
+    # Get current month for the filter default
+    current_month = start_date.strftime('%Y-%m')
 
     return render_template('dashboard.html',
                          cycle_name=cycle_name,
@@ -85,7 +89,8 @@ def dashboard():
                          days_completed=days_completed,
                          total_days=total_days,
                          decimal_to_hours_minutes=decimal_to_hours_minutes,
-                         available_cycles=available_cycles)
+                         available_cycles=available_cycles,
+                         current_month=current_month)
 
 @app.route('/entries')
 @app.route('/entries/<cycle_date>')
@@ -653,6 +658,77 @@ def reports():
                          total_hours=total_hours,
                          monthly_goal=monthly_goal,
                          decimal_to_hours_minutes=decimal_to_hours_minutes)
+
+@app.route('/projects')
+def projects():
+    """List all projects for management"""
+    projects = Project.query.order_by(Project.created_at.desc()).all()
+    return render_template('projects.html', projects=projects)
+
+@app.route('/project/edit/<int:project_id>', methods=['GET', 'POST'])
+def edit_project_page(project_id):
+    """Render and process editing a project"""
+    project = Project.query.get_or_404(project_id)
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        description = request.form.get('description', '').strip()
+        
+        if not name:
+            flash('Project name is required.', 'error')
+            return redirect(url_for('edit_project_page', project_id=project_id))
+        
+        # Check for duplicate names
+        existing_project = Project.query.filter(Project.name == name, Project.id != project_id).first()
+        if existing_project:
+            flash('A project with this name already exists.', 'error')
+            return redirect(url_for('edit_project_page', project_id=project_id))
+        
+        try:
+            project.name = name
+            project.description = description
+            project.updated_at = datetime.utcnow()
+            db.session.commit()
+            flash('Project updated successfully!', 'success')
+            return redirect(url_for('projects'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating project: {str(e)}', 'error')
+            return redirect(url_for('edit_project_page', project_id=project_id))
+    
+    return render_template('edit_project.html', project=project)
+
+@app.route('/project/add', methods=['GET', 'POST'])
+def add_project_page():
+    """Add a new project via dedicated page"""
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        description = request.form.get('description', '').strip()
+        
+        if not name:
+            flash('Project name is required.', 'error')
+            return redirect(url_for('add_project_page'))
+        
+        # Check if project already exists
+        existing_project = Project.query.filter_by(name=name).first()
+        if existing_project:
+            flash('A project with this name already exists.', 'error')
+            return redirect(url_for('add_project_page'))
+        
+        try:
+            new_project = Project()
+            new_project.name = name
+            new_project.description = description
+            db.session.add(new_project)
+            db.session.commit()
+            flash(f'Project "{name}" added successfully!', 'success')
+            return redirect(url_for('projects'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding project: {str(e)}', 'error')
+            return redirect(url_for('add_project_page'))
+    
+    return render_template('add_project.html')
 
 @app.route('/api/cycle_stats/<cycle_date>')
 def api_cycle_stats(cycle_date):
