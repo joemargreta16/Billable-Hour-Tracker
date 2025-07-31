@@ -14,6 +14,41 @@
     </div>
 </div>
 
+<!-- Filters -->
+<div class="row mb-3">
+    <div class="col-12">
+        <form method="GET" action="{{ url_for('entries') }}" class="d-flex align-items-center gap-3 flex-wrap">
+            <div class="d-flex align-items-center gap-1">
+                <label for="filter-cycle" class="form-label mb-0 text-muted">Cycle:</label>
+                <select id="filter-cycle" name="cycle_date" class="form-select form-select-sm">
+                    <option value="">Select Cycle</option>
+                    {% for cycle_start, cycle_end, cycle_display in available_cycles %}
+                        <option value="{{ cycle_start }}" {% if cycle_start == current_cycle_date %}selected{% endif %}>
+                            {{ cycle_display }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+                <label for="filter-week" class="form-label mb-0 text-muted">Week:</label>
+                <input type="week" id="filter-week" name="week" class="form-control form-control-sm" value="{{ request.args.get('week', '') }}">
+            </div>
+            <div class="d-flex align-items-center gap-1">
+                <label for="filter-project" class="form-label mb-0 text-muted">Project:</label>
+                <select id="filter-project" name="project_id" class="form-select form-select-sm">
+                    <option value="">All Projects</option>
+                    {% for project in projects %}
+                        <option value="{{ project.id }}" {% if request.args.get('project_id') == project.id|string %}selected{% endif %}>
+                            {{ project.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-sm btn-outline-primary">Filter</button>
+        </form>
+    </div>
+</div>
+
 <!-- Cycle Navigation -->
 <div class="row mb-4">
     <div class="col-12">
