@@ -1,224 +1,180 @@
 {% extends "base.html" %}
 
-{% block title %}Add Time Entry - Time Tracker{% endblock %}
+{% block title %}Time Entries - Time Tracker{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center">
-            <h1 class="mb-0">Add Time Entry</h1>
-            <a href="{{ url_for('entries') }}" class="btn btn-outline-secondary">
-                <i data-feather="arrow-left" class="me-1"></i>Back to Entries
+            <h1 class="mb-0">Time Entries</h1>
+            <a href="{{ url_for('add_entry') }}" class="btn btn-primary">
+                <i data-feather="plus" class="me-1"></i>Add Entry
             </a>
         </div>
     </div>
 </div>
 
-<div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i data-feather="plus" class="me-2"></i>New Time Entry
-                </h5>
+<!-- Filters -->
+<div class="row mb-3">
+    <div class="col-12">
+        <form method="GET" action="{{ url_for('entries') }}" class="d-flex align-items-center gap-3 flex-wrap">
+            <div class="d-flex align-items-center gap-1">
+                <label for="filter-cycle" class="form-label mb-0 text-muted">Cycle:</label>
+                <select id="filter-cycle" name="cycle_date" class="form-select form-select-sm">
+                    <option value="">Select Cycle</option>
+                    {% for cycle_start, cycle_end, cycle_display in available_cycles %}
+                        <option value="{{ cycle_start }}" {% if cycle_start == current_cycle_date %}selected{% endif %}>
+                            {{ cycle_display }}
+                        </option>
+                    {% endfor %}
+                </select>
             </div>
-            <div class="card-body">
-                <form method="POST" id="addEntryForm">
-                    <!-- Date Field -->
-                    <div class="mb-3">
-                        <label for="date" class="form-label">
-                            <i data-feather="calendar" class="me-1" style="width: 1rem; height: 1rem;"></i>
-                            Date *
-                        </label>
-                        <input type="date" 
-                               class="form-control" 
-                               id="date" 
-                               name="date" 
-                               value="{{ request.form.get('date', default_date) }}" 
-                               required>
-                        <div class="form-text">Select the date for this time entry</div>
-                    </div>
-
-                    <!-- Project Field -->
-                    <div class="mb-3">
-                        <label for="project_id" class="form-label">
-                            <i data-feather="folder" class="me-1" style="width: 1rem; height: 1rem;"></i>
-                            Project *
-                        </label>
-                        <select class="form-select" id="project_id" name="project_id" required>
-                            <option value="">Select a project...</option>
-                            {% for project in projects %}
-                                <option value="{{ project.id }}" 
-                                        {% if request.form.get('project_id') == project.id|string %}selected{% endif %}>
-                                    {{ project.name }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                        <div class="form-text">Choose the project you worked on</div>
-                    </div>
-
-                    <!-- Hours Field -->
-                    <div class="mb-3">
-                        <label for="hours" class="form-label">
-                            <i data-feather="clock" class="me-1" style="width: 1rem; height: 1rem;"></i>
-                            Billable Hours *
-                        </label>
-                        <input type="text" 
-                               class="form-control" 
-                               id="hours" 
-                               name="hours" 
-                               value="{{ request.form.get('hours', '') }}" 
-                               placeholder="e.g., 8 or 8:30 or 8.5"
-                               required>
-                        <div class="form-text">
-                            Enter hours in decimal (8.5) or time format (8:30)
-                        </div>
-                    </div>
-
-                    <!-- Description Field -->
-                    <div class="mb-4">
-                        <label for="description" class="form-label">
-                            <i data-feather="file-text" class="me-1" style="width: 1rem; height: 1rem;"></i>
-                            Description
-                        </label>
-                        <textarea class="form-control" 
-                                  id="description" 
-                                  name="description" 
-                                  rows="3" 
-                                  placeholder="Optional description of work performed...">{{ request.form.get('description', '') }}</textarea>
-                        <div class="form-text">Brief description of the work performed (optional)</div>
-                    </div>
-
-                    <!-- Form Actions -->
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i data-feather="save" class="me-1"></i>Add Entry
-                        </button>
-                        <a href="{{ url_for('entries') }}" class="btn btn-secondary">
-                            <i data-feather="x" class="me-1"></i>Cancel
-                        </a>
-                    </div>
-                </form>
+            <div class="d-flex align-items-center gap-1">
+                <label for="filter-week" class="form-label mb-0 text-muted">Week:</label>
+                <input type="week" id="filter-week" name="week" class="form-control form-control-sm" value="{{ request.args.get('week', '') }}">
             </div>
-        </div>
-
-        <!-- Quick Tips Card -->
-        <div class="card mt-4">
-            <div class="card-header">
-                <h6 class="mb-0">
-                    <i data-feather="info" class="me-2"></i>Quick Tips
-                </h6>
+            <div class="d-flex align-items-center gap-1">
+                <label for="filter-project" class="form-label mb-0 text-muted">Project:</label>
+                <select id="filter-project" name="project_id" class="form-select form-select-sm">
+                    <option value="">All Projects</option>
+                    {% for project in projects %}
+                        <option value="{{ project.id }}" {% if request.args.get('project_id') == project.id|string %}selected{% endif %}>
+                            {{ project.name }}
+                        </option>
+                    {% endfor %}
+                </select>
             </div>
-            <div class="card-body">
-                <ul class="mb-0">
-                    <li class="mb-1">Use decimal format (8.5) or time format (8:30) for hours</li>
-                    <li class="mb-1">All projects are organized by monthly cycles (25th to 24th)</li>
-                    <li class="mb-1">Add descriptions to track specific tasks or deliverables</li>
-                    <li>You can edit or delete entries later from the entries page</li>
+            <button type="submit" class="btn btn-sm btn-outline-primary">Filter</button>
+        </form>
+    </div>
+</div>
+
+<!-- Cycle Navigation -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="cycle-navigation p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">{{ cycle_name }}</h5>
+                <span class="badge bg-primary">{{ decimal_to_hours_minutes(total_hours) }} total</span>
+            </div>
+            
+            <!-- Cycle Selection Dropdown -->
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i data-feather="calendar" class="me-2"></i>Change Cycle
+                </button>
+                <ul class="dropdown-menu">
+                    {% for cycle_start, cycle_end, cycle_display in available_cycles %}
+                        <li>
+                            <a class="dropdown-item {% if cycle_start == current_cycle_date %}active{% endif %}" 
+                               href="{{ url_for('entries', cycle_date=cycle_start) }}">
+                                {{ cycle_display }}
+                            </a>
+                        </li>
+                    {% endfor %}
                 </ul>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Entries List -->
+<div class="row">
+    <div class="col-12">
+        {% if entries_by_date %}
+            {% for date, entries in entries_by_date.items() %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">
+                                <i data-feather="calendar" class="me-2"></i>
+                                {{ date.strftime('%A, %B %d, %Y') }}
+                            </h6>
+                            <span class="badge bg-primary">
+                                {{ decimal_to_hours_minutes(entries | sum(attribute='hours')) }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {% for entry in entries %}
+                            <div class="time-entry-card border rounded p-3 {% if not loop.last %}mb-3{% endif %}">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <i data-feather="folder" class="me-2 text-muted" style="width: 1rem; height: 1rem;"></i>
+                                            <span class="fw-medium">{{ entry.project.name }}</span>
+                                            <span class="badge bg-success ms-2">{{ entry.hours_minutes_display }}</span>
+                                        </div>
+                                        {% if entry.description %}
+                                            <div class="text-muted">{{ entry.description }}</div>
+                                        {% endif %}
+                                        <div class="text-muted small mt-1">
+                                            <i data-feather="clock" class="me-1" style="width: 0.8rem; height: 0.8rem;"></i>
+                                            Added: {{ entry.created_at.strftime('%I:%M %p') }}
+                                            {% if entry.updated_at != entry.created_at %}
+                                                | Updated: {{ entry.updated_at.strftime('%I:%M %p') }}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('edit_entry', entry_id=entry.id) }}" 
+                                           class="btn btn-outline-secondary" title="Edit Entry">
+                                            <i data-feather="edit-2"></i>
+                                        </a>
+                                        <form method="POST" action="{{ url_for('delete_entry', entry_id=entry.id) }}" 
+                                              class="d-inline" 
+                                              onsubmit="return confirm('Are you sure you want to delete this entry?')">
+                                            <button type="submit" class="btn btn-outline-danger" title="Delete Entry">
+                                                <i data-feather="trash-2"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i data-feather="clock" class="text-muted mb-3" style="width: 4rem; height: 4rem;"></i>
+                    <h4>No Time Entries Found</h4>
+                    <p class="text-muted mb-4">No time entries found for the selected cycle period.</p>
+                    <a href="{{ url_for('add_entry') }}" class="btn btn-primary">
+                        <i data-feather="plus" class="me-2"></i>Add Your First Entry
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Summary Card -->
+{% if entries_by_date %}
+<div class="row mt-4">
+    <div class="col-md-6 offset-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">Cycle Summary</h5>
+                <p class="mb-1">
+                    <strong>{{ decimal_to_hours_minutes(total_hours) }}</strong> 
+                    logged across <strong>{{ entries_by_date | length }}</strong> 
+                    day{{ 's' if entries_by_date | length != 1 else '' }}
+                </p>
+                <small class="text-muted">{{ start_date.strftime('%B %d') }} - {{ end_date.strftime('%B %d, %Y') }}</small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
+    // Refresh feather icons after content loads
     document.addEventListener('DOMContentLoaded', function() {
-        // Initialize feather icons
         feather.replace();
-        
-        // Form validation
-        const form = document.getElementById('addEntryForm');
-        const hoursInput = document.getElementById('hours');
-        
-        // Real-time hours validation
-        hoursInput.addEventListener('input', function() {
-            const value = this.value.trim();
-            const isValid = validateHours(value);
-            
-            if (value && !isValid) {
-                this.classList.add('is-invalid');
-                if (!this.nextElementSibling.classList.contains('invalid-feedback')) {
-                    const feedback = document.createElement('div');
-                    feedback.className = 'invalid-feedback';
-                    feedback.textContent = 'Please enter valid hours (e.g., 8, 8:30, or 8.5)';
-                    this.parentNode.appendChild(feedback);
-                }
-            } else {
-                this.classList.remove('is-invalid');
-                const feedback = this.parentNode.querySelector('.invalid-feedback');
-                if (feedback) {
-                    feedback.remove();
-                }
-            }
-        });
-        
-        // Form submission validation
-        form.addEventListener('submit', function(e) {
-            const hoursValue = hoursInput.value.trim();
-            
-            if (!validateHours(hoursValue)) {
-                e.preventDefault();
-                hoursInput.focus();
-                return false;
-            }
-            
-            // Convert to decimal if needed
-            const decimalHours = parseHours(hoursValue);
-            if (decimalHours > 24) {
-                e.preventDefault();
-                alert('Hours cannot exceed 24 per day');
-                hoursInput.focus();
-                return false;
-            }
-        });
-        
-        function validateHours(value) {
-            if (!value) return false;
-            
-            // Decimal format (8.5)
-            if (/^\d+(\.\d+)?$/.test(value)) {
-                return parseFloat(value) > 0;
-            }
-            
-            // Time format (8:30)
-            if (/^\d+:[0-5]\d$/.test(value)) {
-                const parts = value.split(':');
-                const hours = parseInt(parts[0]);
-                const minutes = parseInt(parts[1]);
-                return hours >= 0 && minutes >= 0 && minutes < 60;
-            }
-            
-            // Simple hours (8)
-            if (/^\d+$/.test(value)) {
-                return parseInt(value) > 0;
-            }
-            
-            return false;
-        }
-        
-        function parseHours(value) {
-            // Decimal format
-            if (/^\d+(\.\d+)?$/.test(value)) {
-                return parseFloat(value);
-            }
-            
-            // Time format
-            if (/^\d+:[0-5]\d$/.test(value)) {
-                const parts = value.split(':');
-                const hours = parseInt(parts[0]);
-                const minutes = parseInt(parts[1]);
-                return hours + (minutes / 60);
-            }
-            
-            // Simple hours
-            if (/^\d+$/.test(value)) {
-                return parseInt(value);
-            }
-            
-            return 0;
-        }
     });
 </script>
 {% endblock %}
