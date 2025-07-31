@@ -17,15 +17,17 @@ import io
 
 @app.route('/')
 def dashboard():
-    """Main dashboard showing current cycle statistics with monthly filter"""
-    month_param = request.args.get('month')
-    if month_param:
+    """Main dashboard showing current cycle statistics with date range filter"""
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+    
+    if start_date_str and end_date_str:
         try:
-            # Convert month (YYYY-MM) to a date (we use the first day of the month)
-            target_date = datetime.strptime(month_param + '-01', '%Y-%m-%d').date()
-            start_date, end_date, cycle_name = get_monthly_cycle_for_date(target_date)
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            cycle_name = f"{start_date.strftime('%b %d, %Y')} - {end_date.strftime('%b %d, %Y')}"
         except ValueError:
-            flash('Invalid month format. Please use YYYY-MM.', 'error')
+            flash('Invalid date format. Please use YYYY-MM-DD.', 'error')
             return redirect(url_for('dashboard'))
     else:
         start_date, end_date, cycle_name = get_current_monthly_cycle()
@@ -95,29 +97,50 @@ def dashboard():
 @app.route('/entries')
 @app.route('/entries/<cycle_date>')
 def entries(cycle_date=None):
-    """View all entries for a specific cycle"""
-    if cycle_date:
+    """View all entries with filters for cycle, week, and project"""
+    # Parse query parameters
+    cycle_date_param = request.args.get('cycle_date') or cycle_date
+    week_param = request.args.get('week')
+    project_id_param = request.args.get('project_id')
+    
+    # Determine date range based on cycle_date or week
+    if cycle_date_param:
         try:
-            target_date = datetime.strptime(cycle_date, '%Y-%m-%d').date()
+            target_date = datetime.strptime(cycle_date_param, '%Y-%m-%d').date()
             start_date, end_date, cycle_name = get_monthly_cycle_for_date(target_date)
         except ValueError:
             flash('Invalid date format', 'error')
             return redirect(url_for('entries'))
+    elif week_param:
+        try:
+            year, week_num = map(int, week_param.split('-W'))
+            # Calculate start and end dates of the week (Monday to Sunday)
+            start_date = datetime.strptime(f'{year}-W{week_num - 1}-1', "%Y-W%W-%w").date()
+            end_date = start_date + timedelta(days=6)
+            cycle_name = f"Week {week_num}, {year}"
+        except Exception:
+            flash('Invalid week format', 'error')
+            return redirect(url_for('entries'))
     else:
         start_date, end_date, cycle_name = get_current_monthly_cycle()
     
-    # Get all entries for the cycle
-    entries = TimeEntry.query.filter(
+    # Build query with filters
+    query = TimeEntry.query.filter(
         and_(
             TimeEntry.date >= start_date,
             TimeEntry.date <= end_date
         )
-    ).order_by(TimeEntry.date.desc(), TimeEntry.created_at.desc()).all()
+    )
     
-    # Calculate total hours for the cycle
+    if project_id_param:
+        query = query.filter(TimeEntry.project_id == project_id_param)
+    
+    entries = query.order_by(TimeEntry.date.desc(), TimeEntry.created_at.desc()).all()
+    
+    # Calculate total hours for the filtered entries
     total_hours = sum(entry.hours for entry in entries)
     
-    # Group entries by date for better display
+    # Group entries by date for display
     entries_by_date = {}
     for entry in entries:
         date_key = entry.date
@@ -125,8 +148,9 @@ def entries(cycle_date=None):
             entries_by_date[date_key] = []
         entries_by_date[date_key].append(entry)
     
-    # Get available cycles for navigation
+    # Get available cycles and projects for filters
     available_cycles = get_previous_cycles(12)
+    projects = Project.query.filter_by(active=True).order_by(Project.name).all()
     
     return render_template('entries.html',
                          entries_by_date=entries_by_date,
@@ -136,17 +160,20 @@ def entries(cycle_date=None):
                          total_hours=total_hours,
                          available_cycles=available_cycles,
                          current_cycle_date=start_date,
-                         decimal_to_hours_minutes=decimal_to_hours_minutes)
+                         decimal_to_hours_minutes=decimal_to_hours_minutes,
+                         projects=projects)
 
 @app.route('/add_entry', methods=['GET', 'POST'])
 def add_entry():
     """Add a new time entry"""
+    stay_on_page = request.args.get('stay', 'false').lower() == 'true'
     if request.method == 'POST':
         # Get form data
         date_str = request.form.get('date')
         project_id = request.form.get('project_id')
         hours_str = request.form.get('hours')
         description = request.form.get('description', '').strip()
+        stay_on_page = request.form.get('stay_on_page') == 'true'
         
         # Validate data
         errors = []
@@ -185,7 +212,10 @@ def add_entry():
                 db.session.add(new_entry)
                 db.session.commit()
                 flash('Time entry added successfully!', 'success')
-                return redirect(url_for('entries'))
+                if stay_on_page:
+                    return redirect(url_for('add_entry', stay='true'))
+                else:
+                    return redirect(url_for('entries'))
             except Exception as e:
                 db.session.rollback()
                 flash(f'Error adding entry: {str(e)}', 'error')
