@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Export Data - Time Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="mb-0">Export Data</h1>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                <i data-feather="arrow-left" class="me-1"></i>Back to Dashboard
+            </a>
+        </div>
+        <p class="text-muted">Export your time tracking data to CSV format</p>
+    </div>
+</div>
+
+<!-- Export Options -->
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i data-feather="download" class="me-2"></i>Export Options
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('export_data') }}">
+                    <!-- Date Range -->
+                    <div class="mb-4">
+                        <label class="form-label">
+                            <i data-feather="calendar" class="me-1" style="width: 1rem; height: 1rem;"></i>
+                            Date Range
+                        </label>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="start_date" class="form-label">Start Date</label>
+                                <input type="date" 
+                                       class="form-control" 
+                                       id="start_date" 
+                                       name="start_date" 
+                                       value="{{ start_date if start_date else '' }}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="end_date" class="form-label">End Date</label>
+                                <input type="date" 
+                                       class="form-control" 
+                                       id="end_date" 
+                                       name="end_date" 
+                                       value="{{ end_date if end_date else '' }}">
+                            </div>
+                        </div>
+                        <div class="form-text">Leave blank to export all data</div>
+                    </div>
+
+                    <!-- Project Filter -->
+                    <div class="mb-4">
+                        <label for="project_filter" class="form-label">
+                            <i data-feather="folder" class="me-1" style="width: 1rem; height: 1rem;"></i>
+                            Projects (Optional)
+                        </label>
+                        <select class="form-select" id="project_filter" name="project_ids" multiple>
+                            {% for project in projects %}
+                                <option value="{{ project.id }}">{{ project.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Hold Ctrl/Cmd to select multiple projects. Leave unselected to export all projects.</div>
+                    </div>
+
+                    <!-- Export Format -->
+                    <div class="mb-4">
+                        <label class="form-label">
+                            <i data-feather="file-text" class="me-1" style="width: 1rem; height: 1rem;"></i>
+                            Export Format
+                        </label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="format" id="csv_format" value="csv" checked>
+                            <label class="form-check-label" for="csv_format">
+                                CSV (Comma Separated Values)
+                            </label>
+                        </div>
+                        <div class="form-text">Compatible with Excel, Google Sheets, and other spreadsheet applications</div>
+                    </div>
+
+                    <!-- Include Options -->
+                    <div class="mb-4">
+                        <label class="form-label">Include in Export</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="include_descriptions" name="include_descriptions" checked>
+                            <label class="form-check-label" for="include_descriptions">
+                                Task Descriptions
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="include_totals" name="include_totals" checked>
+                            <label class="form-check-label" for="include_totals">
+                                Daily and Project Totals
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Export Button -->
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i data-feather="download" class="me-1"></i>Export CSV
+                        </button>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                            <i data-feather="x" class="me-1"></i>Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Quick Export Cards -->
+        <div class="row mt-4">
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i data-feather="calendar" class="text-primary mb-2" style="width: 2rem; height: 2rem;"></i>
+                        <h6 class="card-title">Current Month</h6>
+                        <p class="card-text small text-muted">Export current billing cycle data</p>
+                        <a href="{{ url_for('export_data', quick='current_month') }}" class="btn btn-outline-primary btn-sm">
+                            <i data-feather="download" class="me-1"></i>Quick Export
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i data-feather="archive" class="text-success mb-2" style="width: 2rem; height: 2rem;"></i>
+                        <h6 class="card-title">All Data</h6>
+                        <p class="card-text small text-muted">Export complete time tracking history</p>
+                        <a href="{{ url_for('export_data', quick='all_data') }}" class="btn btn-outline-success btn-sm">
+                            <i data-feather="download" class="me-1"></i>Quick Export
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Tips -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i data-feather="info" class="me-2"></i>Export Tips
+                </h6>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li class="mb-2">CSV files can be opened in Excel, Google Sheets, or any spreadsheet application</li>
+                    <li class="mb-2">Date ranges are inclusive (both start and end dates included)</li>
+                    <li class="mb-2">Times are exported in both decimal hours and HH:MM format</li>
+                    <li>Project totals and daily summaries help with billing and reporting</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        feather.replace();
+        
+        // Set default dates for current cycle
+        const today = new Date();
+        const currentDay = today.getDate();
+        
+        // If no dates set, default to current cycle
+        const startDateInput = document.getElementById('start_date');
+        const endDateInput = document.getElementById('end_date');
+        
+        if (!startDateInput.value || !endDateInput.value) {
+            // Calculate current cycle dates (25th to 24th)
+            let cycleStart, cycleEnd;
+            
+            if (currentDay >= 25) {
+                // Current cycle started this month
+                cycleStart = new Date(today.getFullYear(), today.getMonth(), 25);
+                cycleEnd = new Date(today.getFullYear(), today.getMonth() + 1, 24);
+            } else {
+                // Current cycle started last month
+                cycleStart = new Date(today.getFullYear(), today.getMonth() - 1, 25);
+                cycleEnd = new Date(today.getFullYear(), today.getMonth(), 24);
+            }
+            
+            startDateInput.value = cycleStart.toISOString().split('T')[0];
+            endDateInput.value = cycleEnd.toISOString().split('T')[0];
+        }
+    });
+</script>
+{% endblock %}

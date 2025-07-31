@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}Add Time Entry - Time Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="mb-0">Add Time Entry</h1>
+            <a href="{{ url_for('entries') }}" class="btn btn-outline-secondary">
+                <i data-feather="arrow-left" class="me-1"></i>Back to Entries
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i data-feather="plus" class="me-2"></i>New Time Entry
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="addEntryForm">
+                    <!-- Date Field -->
+                    <div class="mb-3">
+                        <label for="date" class="form-label">
+                            <i data-feather="calendar" class="me-1" style="width: 1rem; height: 1rem;"></i>
+                            Date *
+                        </label>
+                        <input type="date" 
+                               class="form-control" 
+                               id="date" 
+                               name="date" 
+                               value="{{ request.form.get('date', default_date) }}" 
+                               required>
+                        <div class="form-text">Select the date for this time entry</div>
+                    </div>
+
+                    <!-- Project Field -->
+                    <div class="mb-3">
+                        <label for="project_id" class="form-label">
+                            <i data-feather="folder" class="me-1" style="width: 1rem; height: 1rem;"></i>
+                            Project *
+                        </label>
+                        <select class="form-select" id="project_id" name="project_id" required>
+                            <option value="">Select a project...</option>
+                            {% for project in projects %}
+                                <option value="{{ project.id }}" 
+                                        {% if request.form.get('project_id') == project.id|string %}selected{% endif %}>
+                                    {{ project.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Choose the project you worked on</div>
+                    </div>
+
+                    <!-- Hours Field -->
+                    <div class="mb-3">
+                        <label for="hours" class="form-label">
+                            <i data-feather="clock" class="me-1" style="width: 1rem; height: 1rem;"></i>
+                            Billable Hours *
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="hours" 
+                               name="hours" 
+                               value="{{ request.form.get('hours', '') }}" 
+                               placeholder="e.g., 8 or 8:30 or 8.5"
+                               required>
+                        <div class="form-text">
+                            Enter hours in decimal (8.5) or time format (8:30)
+                        </div>
+                    </div>
+
+                    <!-- Description Field -->
+                    <div class="mb-4">
+                        <label for="description" class="form-label">
+                            <i data-feather="file-text" class="me-1" style="width: 1rem; height: 1rem;"></i>
+                            Description
+                        </label>
+                        <textarea class="form-control" 
+                                  id="description" 
+                                  name="description" 
+                                  rows="3" 
+                                  placeholder="Optional description of work performed...">{{ request.form.get('description', '') }}</textarea>
+                        <div class="form-text">Brief description of the work performed (optional)</div>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i data-feather="save" class="me-1"></i>Add Entry
+                        </button>
+                        <a href="{{ url_for('entries') }}" class="btn btn-secondary">
+                            <i data-feather="x" class="me-1"></i>Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Quick Tips Card -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i data-feather="info" class="me-2"></i>Quick Tips
+                </h6>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li class="mb-1">Use decimal format (8.5) or time format (8:30) for hours</li>
+                    <li class="mb-1">All projects are organized by monthly cycles (25th to 24th)</li>
+                    <li class="mb-1">Add descriptions to track specific tasks or deliverables</li>
+                    <li>You can edit or delete entries later from the entries page</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize feather icons
+        feather.replace();
+        
+        // Form validation
+        const form = document.getElementById('addEntryForm');
+        const hoursInput = document.getElementById('hours');
+        
+        // Real-time hours validation
+        hoursInput.addEventListener('input', function() {
+            const value = this.value.trim();
+            const isValid = validateHours(value);
+            
+            if (value && !isValid) {
+                this.classList.add('is-invalid');
+                if (!this.nextElementSibling.classList.contains('invalid-feedback')) {
+                    const feedback = document.createElement('div');
+                    feedback.className = 'invalid-feedback';
+                    feedback.textContent = 'Please enter valid hours (e.g., 8, 8:30, or 8.5)';
+                    this.parentNode.appendChild(feedback);
+                }
+            } else {
+                this.classList.remove('is-invalid');
+                const feedback = this.parentNode.querySelector('.invalid-feedback');
+                if (feedback) {
+                    feedback.remove();
+                }
+            }
+        });
+        
+        // Form submission validation
+        form.addEventListener('submit', function(e) {
+            const hoursValue = hoursInput.value.trim();
+            
+            if (!validateHours(hoursValue)) {
+                e.preventDefault();
+                hoursInput.focus();
+                return false;
+            }
+            
+            // Convert to decimal if needed
+            const decimalHours = parseHours(hoursValue);
+            if (decimalHours > 24) {
+                e.preventDefault();
+                alert('Hours cannot exceed 24 per day');
+                hoursInput.focus();
+                return false;
+            }
+        });
+        
+        function validateHours(value) {
+            if (!value) return false;
+            
+            // Decimal format (8.5)
+            if (/^\d+(\.\d+)?$/.test(value)) {
+                return parseFloat(value) > 0;
+            }
+            
+            // Time format (8:30)
+            if (/^\d+:[0-5]\d$/.test(value)) {
+                const parts = value.split(':');
+                const hours = parseInt(parts[0]);
+                const minutes = parseInt(parts[1]);
+                return hours >= 0 && minutes >= 0 && minutes < 60;
+            }
+            
+            // Simple hours (8)
+            if (/^\d+$/.test(value)) {
+                return parseInt(value) > 0;
+            }
+            
+            return false;
+        }
+        
+        function parseHours(value) {
+            // Decimal format
+            if (/^\d+(\.\d+)?$/.test(value)) {
+                return parseFloat(value);
+            }
+            
+            // Time format
+            if (/^\d+:[0-5]\d$/.test(value)) {
+                const parts = value.split(':');
+                const hours = parseInt(parts[0]);
+                const minutes = parseInt(parts[1]);
+                return hours + (minutes / 60);
+            }
+            
+            // Simple hours
+            if (/^\d+$/.test(value)) {
+                return parseInt(value);
+            }
+            
+            return 0;
+        }
+    });
+</script>
+{% endblock %}
