@@ -44,6 +44,6 @@ def init_db_command():
     models.initialize_default_data()
     print("Database initialized.")
 
-# if __name__ == '__main__':
-#     port = int(os.environ.get('PORT', 8000))
-#     app.run(host='0.0.0.0', port=port, debug=True)
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host='0.0.0.0', port=port, debug=True)
