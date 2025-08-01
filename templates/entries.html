@@ -20,14 +20,7 @@
         <form method="GET" action="{{ url_for('entries') }}" class="d-flex flex-wrap gap-3 align-items-center">
             <div class="form-group d-flex flex-column">
                 <label for="filter-cycle" class="form-label mb-1 text-muted">Cycle</label>
-                <select id="filter-cycle" name="cycle_date" class="form-select form-select-sm">
-                    <option value="">Select Cycle</option>
-                    {% for cycle_start, cycle_end, cycle_display in available_cycles %}
-                        <option value="{{ cycle_start }}" {% if cycle_start == current_cycle_date %}selected{% endif %}>
-                            {{ cycle_display }}
-                        </option>
-                    {% endfor %}
-                </select>
+                <!-- Cycle filter removed as per user request -->
             </div>
             <div class="form-group d-flex flex-column">
                 <label for="filter-week" class="form-label mb-1 text-muted">Week</label>
