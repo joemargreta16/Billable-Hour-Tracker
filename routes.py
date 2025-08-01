@@ -26,84 +26,11 @@ from sqlalchemy import func, and_, or_
 import csv
 import io
 
+from flask import redirect, url_for
+
 @app.route('/')
 def dashboard():
-    """Main dashboard showing current cycle statistics with date range filter"""
-    start_date_str = request.args.get('start_date')
-    end_date_str = request.args.get('end_date')
-    
-    if start_date_str and end_date_str:
-        try:
-            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-            cycle_name = f"{start_date.strftime('%b %d, %Y')} - {end_date.strftime('%b %d, %Y')}"
-        except ValueError:
-            flash('Invalid date format. Please use YYYY-MM-DD.', 'error')
-            return redirect(url_for('dashboard'))
-    else:
-        start_date, end_date, cycle_name = get_current_monthly_cycle()
-    
-    # Get monthly goal
-    monthly_goal = float(get_setting('monthly_goal_hours', '160'))
-    
-    # Calculate total billable hours for current cycle
-    total_hours = db.session.query(func.sum(TimeEntry.hours)).filter(
-        and_(
-            TimeEntry.date >= start_date,
-            TimeEntry.date <= end_date
-        )
-    ).scalar() or 0.0
-    
-    # Calculate remaining hours
-    remaining_hours = max(0, monthly_goal - total_hours)
-    
-    # Calculate progress percentage
-    progress_percentage = min(100, (total_hours / monthly_goal) * 100) if monthly_goal > 0 else 0
-    
-    # Get recent entries (last 10)
-    recent_entries = TimeEntry.query.filter(
-        and_(
-            TimeEntry.date >= start_date,
-            TimeEntry.date <= end_date
-        )
-    ).order_by(TimeEntry.date.desc(), TimeEntry.created_at.desc()).limit(10).all()
-    
-    # Get daily totals for current cycle
-    daily_totals = db.session.query(
-        TimeEntry.date,
-        func.sum(TimeEntry.hours).label('total_hours')
-    ).filter(
-        and_(
-            TimeEntry.date >= start_date,
-            TimeEntry.date <= end_date
-        )
-    ).group_by(TimeEntry.date).order_by(TimeEntry.date.desc()).all()
-    
-    # Calculate working days in cycle and working days completed
-    total_days = (end_date - start_date).days + 1
-    days_completed = (date.today() - start_date).days + 1 if date.today() >= start_date else 0
-    days_completed = min(days_completed, total_days)
-    
-    available_cycles = get_previous_cycles(12)
-    
-    # Get current month for the filter default
-    current_month = start_date.strftime('%Y-%m')
-
-    return render_template('dashboard.html',
-                         cycle_name=cycle_name,
-                         start_date=start_date,
-                         end_date=end_date,
-                         total_hours=total_hours,
-                         monthly_goal=monthly_goal,
-                         remaining_hours=remaining_hours,
-                         progress_percentage=progress_percentage,
-                         recent_entries=recent_entries,
-                         daily_totals=daily_totals,
-                         days_completed=days_completed,
-                         total_days=total_days,
-                         decimal_to_hours_minutes=decimal_to_hours_minutes,
-                         available_cycles=available_cycles,
-                         current_month=current_month)
+    return redirect(url_for('entries'))
 
 @app.route('/entries')
 @app.route('/entries/<cycle_date>')
