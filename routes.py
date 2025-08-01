@@ -107,6 +107,42 @@ def dashboard():
                          available_cycles=available_cycles,
                          current_month=current_month)
 
+@app.route('/all_entries')
+def all_entries():
+    """View all entries without filters"""
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    try:
+        entries = TimeEntry.query.order_by(TimeEntry.date.desc(), TimeEntry.created_at.desc()).all()
+        
+        logging.debug(f"Fetched {len(entries)} total time entries")
+        
+        # Group entries by date for display
+        entries_by_date = {}
+        for entry in entries:
+            date_key = entry.date
+            if date_key not in entries_by_date:
+                entries_by_date[date_key] = []
+            entries_by_date[date_key].append(entry)
+        
+        # Get all projects for filter dropdown (if needed)
+        projects = Project.query.filter_by(active=True).order_by(Project.name).all()
+        
+        return render_template('entries.html',
+                             entries_by_date=entries_by_date,
+                             cycle_name="All Entries",
+                             start_date=None,
+                             end_date=None,
+                             total_hours=sum(entry.hours for entry in entries),
+                             available_cycles=[],
+                             current_cycle_date=None,
+                             decimal_to_hours_minutes=decimal_to_hours_minutes,
+                             projects=projects)
+    except Exception as e:
+        logging.error(f"Error in all_entries route: {e}", exc_info=True)
+        flash('An error occurred while loading all entries.', 'error')
+        return render_template('base.html')
+
 @app.route('/entries')
 @app.route('/entries/<cycle_date>')
 def entries(cycle_date=None):
