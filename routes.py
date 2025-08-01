@@ -673,8 +673,19 @@ def search_entries():
 @app.route('/reports')
 def reports():
     """Advanced reports and analytics"""
-    # Get current cycle data
-    start_date, end_date, cycle_name = get_current_monthly_cycle()
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+    
+    if start_date_str and end_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            cycle_name = f"{start_date.strftime('%b %d, %Y')} - {end_date.strftime('%b %d, %Y')}"
+        except ValueError:
+            flash('Invalid date format. Please use YYYY-MM-DD.', 'error')
+            return redirect(url_for('reports'))
+    else:
+        start_date, end_date, cycle_name = get_current_monthly_cycle()
     
     # Get project statistics
     project_stats = db.session.query(
