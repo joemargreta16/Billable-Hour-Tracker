@@ -220,10 +220,10 @@ def entries(cycle_date=None):
                              current_cycle_date=start_date,
                              decimal_to_hours_minutes=decimal_to_hours_minutes,
                              projects=projects)
-    except Exception as e:
-        logging.error(f"Error in entries route: {e}", exc_info=True)
-        flash('An error occurred while loading entries.', 'error')
-        return render_template('base.html')
+    # except Exception as e:
+    #     logging.error(f"Error in entries route: {e}", exc_info=True)
+    #     flash('An error occurred while loading entries.', 'error')
+    #     return render_template('base.html')
 
 @app.route('/add_entry', methods=['GET', 'POST'])
 def add_entry():
