@@ -15,6 +15,36 @@
     </div>
 </div>
 
+<!-- Date Range Filter -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('reports') }}" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="start_date" class="form-label">Start Date</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date" 
+                               value="{{ request.args.get('start_date', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="end_date" class="form-label">End Date</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date" 
+                               value="{{ request.args.get('end_date', '') }}">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i data-feather="filter" class="me-1"></i>Apply Filter
+                        </button>
+                        <a href="{{ url_for('reports') }}" class="btn btn-outline-secondary">
+                            <i data-feather="refresh-cw" class="me-1"></i>Reset
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Summary Cards -->
 <div class="row mb-4">
     <div class="col-md-4 mb-3">
@@ -214,6 +244,22 @@
         initializeProjectChart();
         initializeWeeklyChart();
         initializeHourlyChart();
+        
+        // Set default dates if not set
+        const today = new Date().toISOString().split('T')[0];
+        const startDate = document.getElementById('start_date');
+        const endDate = document.getElementById('end_date');
+        
+        if (!startDate.value) {
+            // Default to start of current month if no date is set
+            const firstDay = new Date();
+            firstDay.setDate(1);
+            startDate.value = firstDay.toISOString().split('T')[0];
+        }
+        
+        if (!endDate.value) {
+            endDate.value = today;
+        }
     });
     
     function initializeProjectChart() {
