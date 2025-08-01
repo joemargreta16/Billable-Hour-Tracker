@@ -1,4 +1,8 @@
 from flask import render_template, request, redirect, url_for, flash, jsonify, Response, make_response
+
+@app.route('/test')
+def test_route():
+    return "Test route is working"
 from app import app, db
 from models import TimeEntry, Project, Settings, get_setting, set_setting
 from utils import (
