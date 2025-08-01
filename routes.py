@@ -117,81 +117,76 @@ def entries(cycle_date=None):
     """View all entries with filters for cycle, week, and project"""
     import logging
     logging.basicConfig(level=logging.DEBUG)
-    try:
-        # Parse query parameters
-        cycle_date_param = request.args.get('cycle_date') or cycle_date
-        week_param = request.args.get('week')
-        project_id_param = request.args.get('project_id')
-        
-        # Determine date range based on cycle_date or week
-        if cycle_date_param:
-            try:
-                target_date = datetime.strptime(cycle_date_param, '%Y-%m-%d').date()
-                start_date, end_date, cycle_name = get_monthly_cycle_for_date(target_date)
-            except ValueError:
-                flash('Invalid date format', 'error')
-                return redirect(url_for('entries'))
-        elif week_param:
-            try:
-                year, week_num = map(int, week_param.split('-W'))
-                # Calculate start and end dates of the week (Monday to Sunday)
-                start_date = datetime.strptime(f'{year}-W{week_num - 1}-1', "%Y-W%W-%w").date()
-                end_date = start_date + timedelta(days=6)
-                cycle_name = f"Week {week_num}, {year}"
-            except Exception:
-                flash('Invalid week format', 'error')
-                return redirect(url_for('entries'))
-        else:
-            start_date, end_date, cycle_name = get_current_monthly_cycle()
-        
-        # Log the date range and cycle name
-        logging.debug(f"Entries route: start_date={start_date}, end_date={end_date}, cycle_name={cycle_name}")
-        
-        # Build query with filters
-        query = TimeEntry.query.filter(
-            and_(
-                TimeEntry.date >= start_date,
-                TimeEntry.date <= end_date
-            )
+    # Parse query parameters
+    cycle_date_param = request.args.get('cycle_date') or cycle_date
+    week_param = request.args.get('week')
+    project_id_param = request.args.get('project_id')
+    
+    # Determine date range based on cycle_date or week
+    if cycle_date_param:
+        try:
+            target_date = datetime.strptime(cycle_date_param, '%Y-%m-%d').date()
+            start_date, end_date, cycle_name = get_monthly_cycle_for_date(target_date)
+        except ValueError:
+            flash('Invalid date format', 'error')
+            return redirect(url_for('entries'))
+    elif week_param:
+        try:
+            year, week_num = map(int, week_param.split('-W'))
+            # Calculate start and end dates of the week (Monday to Sunday)
+            start_date = datetime.strptime(f'{year}-W{week_num - 1}-1', "%Y-W%W-%w").date()
+            end_date = start_date + timedelta(days=6)
+            cycle_name = f"Week {week_num}, {year}"
+        except Exception:
+            flash('Invalid week format', 'error')
+            return redirect(url_for('entries'))
+    else:
+        start_date, end_date, cycle_name = get_current_monthly_cycle()
+    
+    # Log the date range and cycle name
+    logging.debug(f"Entries route: start_date={start_date}, end_date={end_date}, cycle_name={cycle_name}")
+    
+    # Build query with filters
+    query = TimeEntry.query.filter(
+        and_(
+            TimeEntry.date >= start_date,
+            TimeEntry.date <= end_date
         )
-        
-        if project_id_param:
-            query = query.filter(TimeEntry.project_id == project_id_param)
-        
-        entries = query.order_by(TimeEntry.date.desc(), TimeEntry.created_at.desc()).all()
-        
-        # Log the number of entries fetched
-        logging.debug(f"Fetched {len(entries)} time entries for cycle {cycle_name}")
-        
-        # Calculate total hours for the filtered entries
-        total_hours = sum(entry.hours for entry in entries)
-        
-        # Group entries by date for display
-        entries_by_date = {}
-        for entry in entries:
-            date_key = entry.date
-            if date_key not in entries_by_date:
-                entries_by_date[date_key] = []
-            entries_by_date[date_key].append(entry)
-        
-        # Get available cycles and projects for filters
-        available_cycles = get_previous_cycles(12)
-        projects = Project.query.filter_by(active=True).order_by(Project.name).all()
-        
-        return render_template('entries.html',
-                             entries_by_date=entries_by_date,
-                             cycle_name=cycle_name,
-                             start_date=start_date,
-                             end_date=end_date,
-                             total_hours=total_hours,
-                             available_cycles=available_cycles,
-                             current_cycle_date=start_date,
-                             decimal_to_hours_minutes=decimal_to_hours_minutes,
-                             projects=projects)
-    # except Exception as e:
-    #     logging.error(f"Error in entries route: {e}", exc_info=True)
-    #     flash('An error occurred while loading entries.', 'error')
-    #     return render_template('base.html')
+    )
+    
+    if project_id_param:
+        query = query.filter(TimeEntry.project_id == project_id_param)
+    
+    entries = query.order_by(TimeEntry.date.desc(), TimeEntry.created_at.desc()).all()
+    
+    # Log the number of entries fetched
+    logging.debug(f"Fetched {len(entries)} time entries for cycle {cycle_name}")
+    
+    # Calculate total hours for the filtered entries
+    total_hours = sum(entry.hours for entry in entries)
+    
+    # Group entries by date for display
+    entries_by_date = {}
+    for entry in entries:
+        date_key = entry.date
+        if date_key not in entries_by_date:
+            entries_by_date[date_key] = []
+        entries_by_date[date_key].append(entry)
+    
+    # Get available cycles and projects for filters
+    available_cycles = get_previous_cycles(12)
+    projects = Project.query.filter_by(active=True).order_by(Project.name).all()
+    
+    return render_template('entries.html',
+                         entries_by_date=entries_by_date,
+                         cycle_name=cycle_name,
+                         start_date=start_date,
+                         end_date=end_date,
+                         total_hours=total_hours,
+                         available_cycles=available_cycles,
+                         current_cycle_date=start_date,
+                         decimal_to_hours_minutes=decimal_to_hours_minutes,
+                         projects=projects)
 
 @app.route('/add_entry', methods=['GET', 'POST'])
 def add_entry():
