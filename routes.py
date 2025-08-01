@@ -117,6 +117,7 @@ def entries(cycle_date=None):
     """View all entries with filters for cycle, week, and project"""
     import logging
     logging.basicConfig(level=logging.DEBUG)
+    logging.debug("Entries route accessed")
     # Parse query parameters
     cycle_date_param = request.args.get('cycle_date') or cycle_date
     week_param = request.args.get('week')
