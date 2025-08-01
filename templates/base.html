@@ -20,9 +20,7 @@
           crossorigin="anonymous" media="print" onload="this.media='all'">
     
     <!-- Feather Icons with fallback -->
-    <script src="https://unpkg.com/feather-icons@4.29.0/dist/feather.min.js" 
-            integrity="sha384-9t9k4I+5+3tOl5I+5+3tOl5I+5+3tOl5I+5+3tOl5I+5+3tOl5I+5+3tOl5I+5+3t" 
-            crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/feather-icons@4.29.0/dist/feather.min.js"></script>
     
     <!-- Flatpickr for date picking -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css" media="print" onload="this.media='all'">
@@ -260,7 +258,15 @@
         // Initialize Feather icons
         document.addEventListener('DOMContentLoaded', function() {
             if (typeof feather !== 'undefined') {
-                feather.replace();
+                try {
+                    feather.replace();
+                } catch (e) {
+                    console.warn('Feather icons replacement failed:', e);
+                    // Fallback: replace icons with simple text or remove icons
+                    document.querySelectorAll('[data-feather]').forEach(el => {
+                        el.textContent = el.getAttribute('data-feather');
+                    });
+                }
             } else {
                 console.warn('Feather icons failed to load');
             }
