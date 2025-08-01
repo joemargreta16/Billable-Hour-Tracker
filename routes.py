@@ -98,6 +98,9 @@ def dashboard():
 @app.route('/entries/<cycle_date>')
 def entries(cycle_date=None):
     """View all entries with filters for cycle, week, and project"""
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    
     # Parse query parameters
     cycle_date_param = request.args.get('cycle_date') or cycle_date
     week_param = request.args.get('week')
@@ -136,6 +139,9 @@ def entries(cycle_date=None):
         query = query.filter(TimeEntry.project_id == project_id_param)
     
     entries = query.order_by(TimeEntry.date.desc(), TimeEntry.created_at.desc()).all()
+    
+    # Log the number of entries fetched
+    logging.debug(f"Fetched {len(entries)} time entries for cycle {cycle_name}")
     
     # Calculate total hours for the filtered entries
     total_hours = sum(entry.hours for entry in entries)
