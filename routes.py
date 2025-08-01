@@ -106,8 +106,6 @@ def dashboard():
 def entries(cycle_date=None):
     """View all entries with filters for cycle, week, and project"""
     try:
-        logger.info("Entering entries route")
-        
         # Get filter parameters
         cycle_date_param = request.args.get('cycle_date') or cycle_date
         week_param = request.args.get('week')
@@ -126,12 +124,28 @@ def entries(cycle_date=None):
         elif cycle_date_param:
             try:
                 target_date = datetime.strptime(cycle_date_param, '%Y-%m-%d').date()
-                start_date, end_date, cycle_name = get_monthly_cycle_for_date(target_date)
-            except ValueError:
-                flash('Invalid date format. Please use YYYY-MM-DD.', 'error')
+                cycle_data = get_monthly_cycle_for_date(target_date)
+                
+                # Handle both tuple and object returns
+                if hasattr(cycle_data, 'start_date'):  # If it's a Cycle object
+                    start_date = cycle_data.start_date
+                    end_date = cycle_data.end_date
+                    cycle_name = cycle_data.name
+                else:  # If it's a tuple
+                    start_date, end_date, cycle_name = cycle_data
+            except (ValueError, TypeError) as e:
+                logger.error(f"Date processing error: {e}")
+                flash('Invalid date format or cycle data', 'error')
                 return redirect(url_for('entries'))
         else:
-            start_date, end_date, cycle_name = get_current_monthly_cycle()
+            cycle_data = get_current_monthly_cycle()
+            # Handle both tuple and object returns
+            if hasattr(cycle_data, 'start_date'):
+                start_date = cycle_data.start_date
+                end_date = cycle_data.end_date
+                cycle_name = cycle_data.name
+            else:
+                start_date, end_date, cycle_name = cycle_data
 
         # Build query
         query = TimeEntry.query.filter(
@@ -155,8 +169,18 @@ def entries(cycle_date=None):
         # Calculate total hours
         total_hours = sum(entry.hours for entry in entries)
         
-        # Get available cycles and projects for filters
-        available_cycles = get_previous_cycles(12)
+        # Get available cycles - convert Cycle objects to tuples if needed
+        available_cycles = []
+        for cycle in get_previous_cycles(12):
+            if hasattr(cycle, 'start_date'):  # It's a Cycle object
+                available_cycles.append((
+                    cycle.start_date,
+                    cycle.end_date,
+                    cycle.name
+                ))
+            else:  # It's already a tuple
+                available_cycles.append(cycle)
+        
         projects = Project.query.filter_by(active=True).order_by(Project.name).all()
         
         return render_template('entries.html',
