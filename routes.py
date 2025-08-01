@@ -140,6 +140,9 @@ def entries(cycle_date=None):
     else:
         start_date, end_date, cycle_name = get_current_monthly_cycle()
     
+    # Log the date range and cycle name
+    logging.debug(f"Entries route: start_date={start_date}, end_date={end_date}, cycle_name={cycle_name}")
+    
     # Build query with filters
     query = TimeEntry.query.filter(
         and_(
