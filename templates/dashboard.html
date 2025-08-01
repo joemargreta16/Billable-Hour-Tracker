@@ -1,49 +1,51 @@
-import os
-import logging
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
-from werkzeug.middleware.proxy_fix import ProxyFix
-from flask_migrate import Migrate
-
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-
-class Base(DeclarativeBase):
-    pass
-
-db = SQLAlchemy(model_class=Base)
-migrate = Migrate()
-
-# Create the app
-app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
-
-# Configure the database
-database_url = os.environ.get("DATABASE_URL", "sqlite:///timetracker.db")
-app.config["SQLALCHEMY_DATABASE_URI"] = database_url
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
-    "pool_pre_ping": True,
-}
-
-# Initialize the app with the extension
-db.init_app(app)
-migrate.init_app(app, db)
-
-# Import routes after app initialization
-with app.app_context():
-    import routes
-
-@app.cli.command("init-db")
-def init_db_command():
-    """Initializes the database."""
-    import models
-    db.create_all()
-    models.initialize_default_data()
-    print("Database initialized.")
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dashboard - Billable Hour Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Dashboard</h1>
+        <p>Current Cycle: {{ cycle_name }}</p>
+    </header>
+    <section>
+        <h2>Summary</h2>
+        <ul>
+            <li>Total Hours: {{ total_hours }}</li>
+            <li>Monthly Goal: {{ monthly_goal }}</li>
+            <li>Remaining Hours: {{ remaining_hours }}</li>
+            <li>Progress: {{ progress_percentage }}%</li>
+        </ul>
+    </section>
+    <section>
+        <h2>Recent Entries</h2>
+        {% if recent_entries %}
+            <ul>
+            {% for entry in recent_entries %}
+                <li>{{ entry.date }} - {{ entry.project.name if entry.project else 'No Project' }} - {{ entry.hours }} hours</li>
+            {% endfor %}
+            </ul>
+        {% else %}
+            <p>No recent entries.</p>
+        {% endif %}
+    </section>
+    <section>
+        <h2>Daily Totals</h2>
+        {% if daily_totals %}
+            <ul>
+            {% for day in daily_totals %}
+                <li>{{ day.date }}: {{ day.total_hours }} hours</li>
+            {% endfor %}
+            </ul>
+        {% else %}
+            <p>No daily totals available.</p>
+        {% endif %}
+    </section>
+    <footer>
+        <a href="{{ url_for('entries') }}">View All Entries</a>
+    </footer>
+</body>
+</html>
