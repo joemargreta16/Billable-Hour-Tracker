@@ -29,6 +29,10 @@ import io
 from flask import redirect, url_for
 
 @app.route('/')
+def root_redirect():
+    return redirect(url_for('dashboard'))
+
+@app.route('/dashboard')
 def dashboard():
     """Main dashboard showing current cycle statistics with date range filter"""
     start_date_str = request.args.get('start_date')
