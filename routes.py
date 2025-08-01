@@ -30,7 +30,8 @@ from flask import redirect, url_for
 
 @app.route('/')
 def dashboard():
-    return redirect(url_for('entries'))
+    # Render entries view directly to avoid landing page stacking
+    return entries()
 
 @app.route('/entries')
 @app.route('/entries/<cycle_date>')
