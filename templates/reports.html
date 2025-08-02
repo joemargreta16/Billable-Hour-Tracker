@@ -12,6 +12,16 @@
             </a>
         </div>
         <p class="text-muted">Detailed insights for {{ cycle_name }}</p>
+        <div>
+            <strong>Debug Info:</strong>
+            <ul>
+                <li>Project Stats Count: {{ project_stats|length }}</li>
+                <li>Weekly Stats Count: {{ weekly_stats|length }}</li>
+                <li>Hourly Stats Count: {{ hourly_stats|length }}</li>
+                <li>Daily Totals Count: {{ daily_totals|length }}</li>
+                <li>Project Daily Totals Count: {{ project_daily_totals|length }}</li>
+            </ul>
+        </div>
     </div>
 </div>
 
@@ -478,7 +488,8 @@
             return {
                 label: project,
                 data: dates.map(date => {
-                    const entry = project_daily_totals.find(item => item.date === date && item.name === project);
+                    // Convert item.date to string for comparison
+                    const entry = project_daily_totals.find(item => (new Date(item.date).toISOString().split('T')[0]) === date && item.name === project);
                     return entry ? entry.total_hours : 0;
                 }),
                 backgroundColor: getRandomColor(),
