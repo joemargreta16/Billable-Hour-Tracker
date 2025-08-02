@@ -1,0 +1,412 @@
+{% extends "base.html" %}
+
+{% block title %}Reports & Analytics - Time Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="mb-0">Reports & Analytics</h1>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                <i data-feather="arrow-left" class="me-1"></i>Back to Dashboard
+            </a>
+        </div>
+        <p class="text-muted">Detailed insights for {{ cycle_name }}</p>
+    </div>
+</div>
+
+<!-- Date Range Filter -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('reports') }}" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="start_date" class="form-label">Start Date</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date" 
+                               value="{{ request.args.get('start_date', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="end_date" class="form-label">End Date</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date" 
+                               value="{{ request.args.get('end_date', '') }}">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i data-feather="filter" class="me-1"></i>Apply Filter
+                        </button>
+                        <a href="{{ url_for('reports') }}" class="btn btn-outline-secondary">
+                            <i data-feather="refresh-cw" class="me-1"></i>Reset
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card stats-card">
+            <div class="card-body text-center">
+                <i data-feather="clock" class="text-primary mb-2" style="width: 2rem; height: 2rem;"></i>
+                <h4 class="mb-1">{{ decimal_to_hours_minutes(total_hours) }}</h4>
+                <small class="text-muted">Total Logged</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card stats-card">
+            <div class="card-body text-center">
+                <i data-feather="folder" class="text-success mb-2" style="width: 2rem; height: 2rem;"></i>
+                <h4 class="mb-1">{{ project_stats | length }}</h4>
+                <small class="text-muted">Active Projects</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card stats-card">
+            <div class="card-body text-center">
+                <i data-feather="trending-up" class="text-info mb-2" style="width: 2rem; height: 2rem;"></i>
+                <h4 class="mb-1">{{ "%.1f"|format((total_hours / monthly_goal * 100) if monthly_goal > 0 else 0) }}%</h4>
+                <small class="text-muted">Goal Progress</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Project Breakdown -->
+<div class="row mb-4">
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i data-feather="pie-chart" class="me-2"></i>Project Breakdown
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if project_stats %}
+                    <canvas id="projectChart" height="300"></canvas>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i data-feather="folder" class="mb-3" style="width: 3rem; height: 3rem;"></i>
+                        <p>No project data available for this period</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i data-feather="list" class="me-2"></i>Project Statistics
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if project_stats %}
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        {% for stat in project_stats %}
+                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                <div>
+                                    <div class="fw-medium">{{ stat.name[:20] }}{% if stat.name|length > 20 %}...{% endif %}</div>
+                                    <small class="text-muted">{{ stat.entry_count }} entries</small>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-medium">{{ decimal_to_hours_minutes(stat.total_hours) }}</div>
+                                    <small class="text-muted">{{ "%.1f"|format(stat.avg_hours) }}h avg</small>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted py-3">
+                        <p class="mb-0">No project data available</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Time Patterns -->
+<div class="row mb-4">
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i data-feather="calendar" class="me-2"></i>Weekly Patterns
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if weekly_stats %}
+                    <canvas id="weeklyChart" height="300"></canvas>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i data-feather="calendar" class="mb-3" style="width: 3rem; height: 3rem;"></i>
+                        <p>No weekly pattern data available</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i data-feather="clock" class="me-2"></i>Hourly Distribution
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if hourly_stats %}
+                    <canvas id="hourlyChart" height="300"></canvas>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i data-feather="clock" class="mb-3" style="width: 3rem; height: 3rem;"></i>
+                        <p>No hourly distribution data available</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Insights -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i data-feather="lightbulb" class="me-2"></i>Insights & Recommendations
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Productivity Insights</h6>
+                        <ul class="list-unstyled">
+                            {% if project_stats %}
+                                <li class="mb-2">
+                                    <i data-feather="star" class="text-warning me-2" style="width: 1rem; height: 1rem;"></i>
+                                    Top project: <strong>{{ project_stats[0].name }}</strong> ({{ decimal_to_hours_minutes(project_stats[0].total_hours) }})
+                                </li>
+                                {% if project_stats|length > 1 %}
+                                <li class="mb-2">
+                                    <i data-feather="activity" class="text-info me-2" style="width: 1rem; height: 1rem;"></i>
+                                    Working on {{ project_stats|length }} different projects
+                                </li>
+                                {% endif %}
+                                <li class="mb-2">
+                                    <i data-feather="trending-up" class="text-success me-2" style="width: 1rem; height: 1rem;"></i>
+                                    Average session: {{ "%.1f"|format((project_stats | map(attribute='avg_hours') | list | sum) / (project_stats | length)) }}h
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Goal Tracking</h6>
+                        <ul class="list-unstyled">
+                            {% set goal_progress = (total_hours / monthly_goal * 100) if monthly_goal > 0 else 0 %}
+                            <li class="mb-2">
+                                <i data-feather="target" class="text-primary me-2" style="width: 1rem; height: 1rem;"></i>
+                                {% if goal_progress >= 100 %}
+                                    Goal achieved! {{ "%.1f"|format(goal_progress - 100) }}% over target
+                                {% elif goal_progress >= 75 %}
+                                    On track to meet your goal
+                                {% elif goal_progress >= 50 %}
+                                    Halfway to your monthly goal
+                                {% else %}
+                                    {{ "%.1f"|format(100 - goal_progress) }}% remaining to reach goal
+                                {% endif %}
+                            </li>
+                            <li class="mb-2">
+                                <i data-feather="calendar" class="text-info me-2" style="width: 1rem; height: 1rem;"></i>
+                                Remaining: {{ decimal_to_hours_minutes(monthly_goal - total_hours) }} hours
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        feather.replace();
+        
+        // Initialize charts
+        initializeProjectChart();
+        initializeWeeklyChart();
+        initializeHourlyChart();
+        
+        // Set default dates if not set
+        const today = new Date().toISOString().split('T')[0];
+        const startDate = document.getElementById('start_date');
+        const endDate = document.getElementById('end_date');
+        
+        if (!startDate.value) {
+            // Default to start of current month if no date is set
+            const firstDay = new Date();
+            firstDay.setDate(1);
+            startDate.value = firstDay.toISOString().split('T')[0];
+        }
+        
+        if (!endDate.value) {
+            endDate.value = today;
+        }
+    });
+    
+    function initializeProjectChart() {
+        const ctx = document.getElementById('projectChart');
+        if (!ctx) return;
+        
+        {% if project_stats %}
+        const projectData = [
+            {% for stat in project_stats %}
+            {
+                name: '{{ stat.name | replace("'", "\\'") }}',
+                hours: {{ stat.total_hours }},
+                entries: {{ stat.entry_count }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+        
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: projectData.map(p => p.name),
+                datasets: [{
+                    data: projectData.map(p => p.hours),
+                    backgroundColor: [
+                        '#0d6efd', '#198754', '#dc3545', '#ffc107', '#6f42c1',
+                        '#fd7e14', '#20c997', '#6c757d', '#f8d7da', '#d1ecf1'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#212529'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const data = projectData[context.dataIndex];
+                                return `${context.label}: ${data.hours.toFixed(1)}h (${data.entries} entries)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        {% endif %}
+    }
+    
+    function initializeWeeklyChart() {
+        const ctx = document.getElementById('weeklyChart');
+        if (!ctx) return;
+        
+        {% if weekly_stats %}
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const weeklyData = Array(7).fill(0);
+        
+        {% for stat in weekly_stats %}
+        weeklyData[{{ stat.day_of_week }}] = {{ stat.total_hours }};
+        {% endfor %}
+        
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: dayNames,
+                datasets: [{
+                    label: 'Hours',
+                    data: weeklyData,
+                    backgroundColor: '#0d6efd',
+                    borderColor: '#0d6efd',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return value + 'h';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        {% endif %}
+    }
+    
+    function initializeHourlyChart() {
+        const ctx = document.getElementById('hourlyChart');
+        if (!ctx) return;
+        
+        {% if hourly_stats %}
+        const hourlyData = Array(24).fill(0);
+        
+        {% for stat in hourly_stats %}
+        hourlyData[{{ stat.hour }}] = {{ stat.entries }};
+        {% endfor %}
+        
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array.from({length: 24}, (_, i) => i + ':00'),
+                datasets: [{
+                    label: 'Entries',
+                    data: hourlyData,
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+        {% endif %}
+    }
+</script>
+{% endblock %}
