@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Fix for Render deployment - handles missing updated_at column
+Fix for Render deployment - handles missing columns and tables
 Run this as a one-time setup script in Render's deploy commands
 """
 
@@ -29,7 +29,54 @@ def fix_database():
                 # PostgreSQL specific fixes
                 print("🔧 Fixing PostgreSQL database...")
                 
-                # Check if updated_at column exists
+                # Check if user table exists
+                result = conn.execute(text("""
+                    SELECT table_name 
+                    FROM information_schema.tables 
+                    WHERE table_name = 'user'
+                """))
+                
+                if not result.fetchone():
+                    print("Creating user table...")
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS "user" (
+                            id SERIAL PRIMARY KEY,
+                            username VARCHAR(80) UNIQUE NOT NULL,
+                            password_hash VARCHAR(120) NOT NULL,
+                            is_admin BOOLEAN DEFAULT FALSE NOT NULL,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    """))
+                
+                # Check if user_id column exists in project table
+                result = conn.execute(text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'project' AND column_name = 'user_id'
+                """))
+                
+                if not result.fetchone():
+                    print("Adding user_id column to project table...")
+                    conn.execute(text("""
+                        ALTER TABLE project 
+                        ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES "user"(id)
+                    """))
+                
+                # Check if user_id column exists in time_entry table
+                result = conn.execute(text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'time_entry' AND column_name = 'user_id'
+                """))
+                
+                if not result.fetchone():
+                    print("Adding user_id column to time_entry table...")
+                    conn.execute(text("""
+                        ALTER TABLE time_entry 
+                        ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES "user"(id)
+                    """))
+                
+                # Check if updated_at column exists in project table
                 result = conn.execute(text("""
                     SELECT column_name 
                     FROM information_schema.columns 
@@ -61,7 +108,7 @@ def fix_database():
                         )
                     """))
                 
-                # Check for time_entry table
+                # Check for time_entry table (in case it's missing)
                 result = conn.execute(text("""
                     SELECT table_name 
                     FROM information_schema.tables 
@@ -78,7 +125,8 @@ def fix_database():
                             hours DECIMAL(5,2) NOT NULL,
                             description VARCHAR(500),
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            user_id INTEGER REFERENCES "user"(id)
                         )
                     """))
                 
@@ -89,10 +137,41 @@ def fix_database():
                 # SQLite fixes
                 print("🔧 Fixing SQLite database...")
                 
+                # Add user_id column to project table if missing
+                try:
+                    conn.execute(text("""
+                        ALTER TABLE project ADD COLUMN user_id INTEGER REFERENCES user(id)
+                    """))
+                    print("Added user_id column to project table")
+                except Exception as e:
+                    if "duplicate column name" not in str(e).lower():
+                        print(f"Note: {e}")
+                    else:
+                        print("user_id column already exists in project table")
+                
+                # Add user_id column to time_entry table if missing
+                try:
+                    conn.execute(text("""
+                        ALTER TABLE time_entry ADD COLUMN user_id INTEGER REFERENCES user(id)
+                    """))
+                    print("Added user_id column to time_entry table")
+                except Exception as e:
+                    if "duplicate column name" not in str(e).lower():
+                        print(f"Note: {e}")
+                    else:
+                        print("user_id column already exists in time_entry table")
+                
                 # Add updated_at column if missing
-                conn.execute(text("""
-                    ALTER TABLE project ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                """))
+                try:
+                    conn.execute(text("""
+                        ALTER TABLE project ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    """))
+                    print("Added updated_at column to project table")
+                except Exception as e:
+                    if "duplicate column name" not in str(e).lower():
+                        print(f"Note: {e}")
+                    else:
+                        print("updated_at column already exists in project table")
                 
                 conn.commit()
                 print("✅ SQLite database fixed successfully")

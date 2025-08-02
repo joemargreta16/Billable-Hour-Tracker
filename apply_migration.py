@@ -1,8 +1,17 @@
+"""
+Legacy migration script - Use apply_migrations.py instead
+This script directly calls Alembic operations which is not the proper way
+"""
+
+import warnings
+warnings.warn("This is a legacy migration script. Use apply_migrations.py instead.", DeprecationWarning)
+
 from app import app, db
 from alembic import op
 import sqlalchemy as sa
 
 with app.app_context():
+    print("Applying legacy migration...")
     # Create users table
     op.create_table('user',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -21,4 +30,5 @@ with app.app_context():
     op.add_column('time_entry', sa.Column('user_id', sa.Integer(), nullable=True))
     op.create_foreign_key(None, 'time_entry', 'user', ['user_id'], ['id'])
     
-    print('Migration applied')
+    print('Legacy migration applied')
+    print('Note: For future deployments, use apply_migrations.py instead')
