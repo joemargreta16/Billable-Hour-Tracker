@@ -78,23 +78,141 @@
 
 <!-- Project Breakdown -->
 <div class="row mb-4">
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i data-feather="pie-chart" class="me-2"></i>Project Breakdown
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if project_stats %}
+                    <p>Reports and analysis available.</p>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i data-feather="folder" class="mb-3" style="width: 3rem; height: 3rem;"></i>
+                        <p>No project data available for this period</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i data-feather="list" class="me-2"></i>Project Statistics
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if project_stats %}
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        {% for stat in project_stats %}
+                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                <div>
+                                    <div class="fw-medium">{{ stat.name[:20] }}{% if stat.name|length > 20 %}...{% endif %}</div>
+                                    <small class="text-muted">{{ stat.entry_count }} entries</small>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-medium">{{ decimal_to_hours_minutes(stat.total_hours) }}</div>
+                                    <small class="text-muted">{{ "%.1f"|format(stat.avg_hours) }}h avg</small>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted py-3">
+                        <p class="mb-0">No project data available</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Time Patterns -->
+<div class="row mb-4">
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i data-feather="calendar" class="me-2"></i>Weekly Patterns
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if weekly_stats %}
+                    <canvas id="weeklyChart" height="300"></canvas>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i data-feather="calendar" class="mb-3" style="width: 3rem; height: 3rem;"></i>
+                        <p>No weekly pattern data available</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i data-feather="clock" class="me-2"></i>Hourly Distribution
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if hourly_stats %}
+                    <canvas id="hourlyChart" height="300"></canvas>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i data-feather="clock" class="mb-3" style="width: 3rem; height: 3rem;"></i>
+                        <p>No hourly distribution data available</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Additional Charts -->
+<div class="row mb-4">
     <div class="col-lg-12 mb-4">
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">
-                    <i data-feather="file-text" class="me-2"></i>Reports & Analysis Summary
+                    <i data-feather="bar-chart" class="me-2"></i>Project Daily Totals (Stacked Bar Chart)
                 </h5>
             </div>
             <div class="card-body">
-                <p>Summary of reports and analysis will be displayed here.</p>
-                {% if project_stats %}
-                    <ul>
-                        {% for stat in project_stats %}
-                            <li>{{ stat.name }}: {{ decimal_to_hours_minutes(stat.total_hours) }} logged across {{ stat.entry_count }} entries</li>
-                        {% endfor %}
-                    </ul>
+                {% if project_daily_totals %}
+                    <canvas id="projectDailyChart" height="300"></canvas>
                 {% else %}
-                    <p>No project data available for this period.</p>
+                    <div class="text-center text-muted py-4">
+                        <i data-feather="bar-chart" class="mb-3" style="width: 3rem; height: 3rem;"></i>
+                        <p>No project daily totals data available</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-lg-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i data-feather="calendar" class="me-2"></i>Daily Totals Heatmap
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if daily_totals %}
+                    <canvas id="dailyTotalsHeatmap" height="100"></canvas>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i data-feather="calendar" class="mb-3" style="width: 3rem; height: 3rem;"></i>
+                        <p>No daily totals data available</p>
+                    </div>
                 {% endif %}
             </div>
         </div>
@@ -111,7 +229,51 @@
                 </h5>
             </div>
             <div class="card-body">
-                <p>Summary of insights and recommendations will be displayed here.</p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Productivity Insights</h6>
+                        <ul class="list-unstyled">
+                            {% if project_stats %}
+                                <li class="mb-2">
+                                    <i data-feather="star" class="text-warning me-2" style="width: 1rem; height: 1rem;"></i>
+                                    Top project: <strong>{{ project_stats[0].name }}</strong> ({{ decimal_to_hours_minutes(project_stats[0].total_hours) }})
+                                </li>
+                                {% if project_stats|length > 1 %}
+                                <li class="mb-2">
+                                    <i data-feather="activity" class="text-info me-2" style="width: 1rem; height: 1rem;"></i>
+                                    Working on {{ project_stats|length }} different projects
+                                </li>
+                                {% endif %}
+                                <li class="mb-2">
+                                    <i data-feather="trending-up" class="text-success me-2" style="width: 1rem; height: 1rem;"></i>
+                                    Average session: {{ "%.1f"|format((project_stats | map(attribute='avg_hours') | list | sum) / (project_stats | length)) }}h
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Goal Tracking</h6>
+                        <ul class="list-unstyled">
+                            {% set goal_progress = (total_hours / monthly_goal * 100) if monthly_goal > 0 else 0 %}
+                            <li class="mb-2">
+                                <i data-feather="target" class="text-primary me-2" style="width: 1rem; height: 1rem;"></i>
+                                {% if goal_progress >= 100 %}
+                                    Goal achieved! {{ "%.1f"|format(goal_progress - 100) }}% over target
+                                {% elif goal_progress >= 75 %}
+                                    On track to meet your goal
+                                {% elif goal_progress >= 50 %}
+                                    Halfway to your monthly goal
+                                {% else %}
+                                    {{ "%.1f"|format(100 - goal_progress) }}% remaining to reach goal
+                                {% endif %}
+                            </li>
+                            <li class="mb-2">
+                                <i data-feather="calendar" class="text-info me-2" style="width: 1rem; height: 1rem;"></i>
+                                Remaining: {{ decimal_to_hours_minutes(monthly_goal - total_hours) }} hours
+                            </li>
+                        </ul>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
