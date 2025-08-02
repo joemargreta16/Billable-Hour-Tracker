@@ -20,6 +20,15 @@
                 <li><strong>Remaining Hours:</strong> {{ remaining_hours }}</li>
                 <li><strong>Progress:</strong> {{ "%.2f"|format(progress_percentage) }}%</li>
             </ul>
+            <div class="progress mt-2" style="height: 20px;">
+                <div class="progress-bar" role="progressbar" style="width: {{ progress_percentage }}%;" aria-valuenow="{{ progress_percentage }}" aria-valuemin="0" aria-valuemax="100">{{ "%.2f"|format(progress_percentage) }}%</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h5>Hours Overview</h5>
+            <canvas id="hoursChart" width="400" height="200"></canvas>
         </div>
     </div>
 </div>
@@ -62,4 +71,36 @@
 <footer>
     <a href="{{ url_for('entries') }}" class="btn btn-primary">View All Entries</a>
 </footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const ctx = document.getElementById('hoursChart').getContext('2d');
+    const hoursChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Total Hours', 'Monthly Goal'],
+            datasets: [{
+                label: 'Hours',
+                data: [{{ total_hours }}, {{ monthly_goal }}],
+                backgroundColor: [
+                    'rgba(54, 162, 235, 0.7)',
+                    'rgba(255, 99, 132, 0.7)'
+                ],
+                borderColor: [
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 99, 132, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: Math.max({{ monthly_goal }}, {{ total_hours }}) + 10
+                }
+            }
+        }
+    });
+</script>
 {% endblock %}
