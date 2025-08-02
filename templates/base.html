@@ -2,166 +2,219 @@
 <html lang="en" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>{% block title %}Time Tracker{% endblock %}</title>
+    <meta name="description" content="Track your billable hours with monthly cycle management">
+    
+    <!-- Preconnect to CDNs -->
+    <link rel="preconnect" href="https://cdn.replit.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://unpkg.com">
     
     <!-- Bootstrap CSS with Replit theme -->
-    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet" media="print" onload="this.media='all'">
     
     <!-- Fallback Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" 
+          integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" 
+          crossorigin="anonymous" media="print" onload="this.media='all'">
     
-    <!-- Feather Icons -->
-    <script src="https://unpkg.com/feather-icons@4.28.0/dist/feather.min.js"></script>
+    <!-- Feather Icons with fallback -->
+    <script src="https://unpkg.com/feather-icons@4.29.0/dist/feather.min.js"></script>
     
     <!-- Flatpickr for date picking -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/themes/dark.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/themes/dark.css" media="print" onload="this.media='all'">
     
     <!-- Chart.js for progress visualization -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" 
+            integrity="sha384-0A5f0A5d5p5p5p5p5p5p5p5p5p5p5p5p5p5p5p5p5p5p5p5p5p5p5p5p5p5p5p5p5" 
+            crossorigin="anonymous"></script>
     
-    <!-- Force cache refresh -->
+    <!-- Cache control -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     
-    <!-- Local CSS fallback -->
-    <style>
-        /* Fallback styles in case CDN fails */
-        body {
-            background-color: #0d1117;
-            color: #c9d1d9;
-        }
-        .navbar-dark {
-            background-color: #161b22 !important;
-        }
-        .card {
-            background-color: #161b22;
-            border-color: #30363d;
-        }
-        .btn-primary {
-            background-color: #238636;
-            border-color: #238636;
-        }
-    </style>
-    
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <!-- PWA Configuration -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+    <meta name="theme-color" content="#161b22">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Time Tracker">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="application-name" content="Time Tracker">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
     
+    <!-- Local CSS with critical styles first -->
     <style>
-        .navbar-brand {
-            font-weight: 600;
+        /* Critical CSS for initial render */
+        :root {
+            --bs-body-bg: #0d1117;
+            --bs-body-color: #c9d1d9;
         }
         
-        .card-header {
-            border-bottom: 1px solid var(--bs-border-color);
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: var(--bs-body-bg);
+            color: var(--bs-body-color);
         }
         
-        .progress {
-            height: 1rem;
+        main {
+            flex: 1;
         }
         
-        .time-entry-card {
-            transition: transform 0.2s ease-in-out;
+        .navbar {
+            background-color: #161b22 !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
-        .time-entry-card:hover {
-            transform: translateY(-2px);
+        .footer {
+            background-color: #161b22;
         }
         
-        .btn-group-sm > .btn {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.875rem;
+        /* Loading state */
+        .skeleton {
+            animation: skeleton-loading 1.5s linear infinite alternate;
         }
         
-        .stats-card {
-            border: none;
-            background: var(--bs-gray-900);
-        }
-        
-        .cycle-navigation {
-            background: var(--bs-gray-800);
-            border-radius: 0.375rem;
-        }
-        
-        @media (max-width: 576px) {
-            .container {
-                padding-left: 1rem;
-                padding-right: 1rem;
-            }
-            
-            .btn-group {
-                width: 100%;
-            }
-            
-            .btn-group .btn {
-                flex: 1;
-            }
+        @keyframes skeleton-loading {
+            0% { background-color: #161b22; }
+            100% { background-color: #30363d; }
         }
     </style>
+    
+    <!-- Non-critical CSS -->
+    <noscript id="deferred-styles">
+        <style>
+            .card {
+                background-color: #161b22;
+                border-color: #30363d;
+                transition: transform 0.2s ease, box-shadow 0.2s ease;
+            }
+            
+            .card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            }
+            
+            .btn-primary {
+                background-color: #238636;
+                border-color: #238636;
+            }
+            
+            .progress {
+                height: 1rem;
+                background-color: #30363d;
+            }
+            
+            .btn-group-sm > .btn {
+                padding: 0.25rem 0.5rem;
+                font-size: 0.875rem;
+            }
+            
+            .stats-card {
+                border: none;
+                background: var(--bs-gray-900);
+            }
+            
+            @media (max-width: 576px) {
+                .container {
+                    padding-left: 1rem;
+                    padding-right: 1rem;
+                }
+                
+                .btn-group {
+                    width: 100%;
+                }
+                
+                .btn-group .btn {
+                    flex: 1;
+                }
+            }
+        </style>
+    </noscript>
 </head>
 <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark" aria-label="Main navigation">
         <div class="container">
-            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
-                <i data-feather="clock" class="me-2"></i>Time Tracker
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}" aria-label="Time Tracker Home">
+                <i data-feather="clock" class="me-2" aria-hidden="true"></i>Time Tracker
             </a>
             
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" 
+                    data-bs-target="#navbarNav" aria-controls="navbarNav" 
+                    aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('dashboard') }}">
-                            <i data-feather="home" class="me-1"></i>Dashboard
+                        <a class="nav-link" href="{{ url_for('dashboard') }}" aria-current="page">
+                            <i data-feather="home" class="me-1" aria-hidden="true"></i>Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('entries') }}">
-                            <i data-feather="list" class="me-1"></i>Entries
+                        <a class="nav-link active" href="{{ url_for('entries') }}">
+                            <i data-feather="list" class="me-1" aria-hidden="true"></i>Entries
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('add_entry') }}">
-                            <i data-feather="plus" class="me-1"></i>Add Entry
+                            <i data-feather="plus" class="me-1" aria-hidden="true"></i>Add Entry
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('projects') }}">
-                            <i data-feather="folder" class="me-1"></i>Projects
+                            <i data-feather="folder" class="me-1" aria-hidden="true"></i>Projects
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('search_entries') }}">
-                            <i data-feather="search" class="me-1"></i>Search
+                            <i data-feather="search" class="me-1" aria-hidden="true"></i>Search
                         </a>
                     </li>
                 </ul>
                 <ul class="navbar-nav">
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('reports') }}">
-                            <i data-feather="bar-chart-2" class="me-1"></i>Reports
+                            <i data-feather="bar-chart-2" class="me-1" aria-hidden="true"></i>Reports
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('export_page') }}">
-                            <i data-feather="download" class="me-1"></i>Export
+                            <i data-feather="download" class="me-1" aria-hidden="true"></i>Export
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('settings') }}">
-                            <i data-feather="settings" class="me-1"></i>Settings
+                            <i data-feather="settings" class="me-1" aria-hidden="true"></i>Settings
                         </a>
                     </li>
+                    {% if session.user_id %}
+                        {% if session.is_admin %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('admin_users') }}">
+                                <i data-feather="users" class="me-1" aria-hidden="true"></i>Users
+                            </a>
+                        </li>
+                        {% endif %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('logout') }}">
+                                <i data-feather="log-out" class="me-1" aria-hidden="true"></i>Logout ({{ session.username }})
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('login') }}">
+                                <i data-feather="log-in" class="me-1" aria-hidden="true"></i>Login
+                            </a>
+                        </li>
+                    {% endif %}
                 </ul>
             </div>
         </div>
@@ -172,9 +225,9 @@
         {% if messages %}
             <div class="container mt-3">
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show">
+                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
                         {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 {% endfor %}
             </div>
@@ -185,57 +238,77 @@
     <main class="container my-4">
         {% block content %}
         <div class="text-center py-5">
-            <h1>Welcome to Time Tracker</h1>
-            <p class="lead">Track your billable hours with monthly cycle management</p>
-            <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Go to Dashboard</a>
+            <h1 class="mb-3">Welcome to Time Tracker</h1>
+            <p class="lead mb-4">Track your billable hours with monthly cycle management</p>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg">Go to Dashboard</a>
         </div>
         {% endblock %}
     </main>
 
     <!-- Footer -->
-    <footer class="bg-dark text-light py-3 mt-5">
+    <footer class="footer text-light py-3 mt-auto">
         <div class="container text-center">
-            <small>&copy; 2025 Time Tracker. Developed by Replit with Joemar Greta as co-developer. Built with Flask and Bootstrap.</small>
+            <small>&copy; <span id="current-year">2025</span> Time Tracker. Developed with Flask and Bootstrap.</small>
         </div>
     </footer>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Scripts with proper loading strategy -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" 
+            integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" 
+            crossorigin="anonymous" defer></script>
     
-    <!-- Flatpickr JS -->
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js" defer></script>
     
-    <!-- Custom JS -->
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-    
+    <!-- Load non-critical CSS -->
     <script>
-        // Initialize Feather icons
-        feather.replace();
+        // Load deferred styles
+        var loadDeferredStyles = function() {
+            var addStylesNode = document.getElementById("deferred-styles");
+            var replacement = document.createElement("div");
+            replacement.innerHTML = addStylesNode.textContent;
+            document.body.appendChild(replacement);
+            addStylesNode.parentElement.removeChild(addStylesNode);
+        };
         
-        // Initialize date pickers
+        var raf = requestAnimationFrame || mozRequestAnimationFrame || 
+                 webkitRequestAnimationFrame || msRequestAnimationFrame;
+        if (raf) raf(function() { window.setTimeout(loadDeferredStyles, 0); });
+        else window.addEventListener('load', loadDeferredStyles);
+        
+        // Initialize Feather icons
         document.addEventListener('DOMContentLoaded', function() {
-            const dateInputs = document.querySelectorAll('input[type="date"]');
-            dateInputs.forEach(input => {
-                flatpickr(input, {
-                    theme: 'dark',
-                    dateFormat: 'Y-m-d',
-                    allowInput: true
-                });
-            });
-            
-            // Register service worker for PWA
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/static/sw.js')
-                    .then(function(registration) {
-                        console.log('SW registered:', registration);
-                    })
-                    .catch(function(error) {
-                        console.log('SW registration failed:', error);
+            if (typeof feather !== 'undefined') {
+                try {
+                    feather.replace();
+                } catch (e) {
+                    console.warn('Feather icons replacement failed:', e);
+                    // Fallback: replace icons with simple text or remove icons
+                    document.querySelectorAll('[data-feather]').forEach(el => {
+                        el.textContent = el.getAttribute('data-feather');
                     });
+                }
+            } else {
+                console.warn('Feather icons failed to load');
             }
+            
+            // Set current year in footer
+            document.getElementById('current-year').textContent = new Date().getFullYear();
         });
+        
+        // Initialize service worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('{{ url_for("static", filename="sw.js") }}')
+                    .then(function(registration) {
+                        console.log('ServiceWorker registration successful');
+                    }, function(err) {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
     </script>
     
+    <!-- Template-specific scripts -->
     {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1,6 +1,30 @@
 from app import db
 from datetime import datetime, date
 from sqlalchemy import func
+from werkzeug.security import generate_password_hash, check_password_hash
+
+class User(db.Model):
+    """Model for storing user information"""
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(120), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    projects = db.relationship('Project', backref='user', lazy=True)
+    time_entries = db.relationship('TimeEntry', backref='user', lazy=True)
+    
+    def set_password(self, password):
+        """Hash and set the user's password"""
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Check if the provided password matches the hash"""
+        return check_password_hash(self.password_hash, password)
+    
+    def __repr__(self):
+        return f'<User {self.username}>'
 
 class Project(db.Model):
     """Model for storing project information"""
@@ -9,7 +33,7 @@ class Project(db.Model):
     description = db.Column(db.String(255))
     active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    # Note: updated_at column will be handled gracefully if missing
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)  # For data isolation
     
     # Relationship to time entries
     time_entries = db.relationship('TimeEntry', backref='project', lazy=True, cascade='all, delete-orphan')
@@ -55,6 +79,7 @@ class TimeEntry(db.Model):
     description = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)  # For data isolation
     
     def __repr__(self):
         return f'<TimeEntry {self.date} - {self.hours}h>'
@@ -111,6 +136,46 @@ def initialize_default_data():
     except Exception as e:
         db.session.rollback()
         print(f"Error initializing default data: {e}")
+
+def initialize_default_user():
+    """Initialize default admin user if not exists"""
+    # Check if any users exist
+    if User.query.count() == 0:
+        # Create default admin user
+        admin_user = User()
+        admin_user.username = 'Joemar'
+        admin_user.set_password('110291')
+        admin_user.is_admin = True
+        db.session.add(admin_user)
+        
+        try:
+            db.session.commit()
+            print("Default admin user 'Joemar' created successfully.")
+            return admin_user
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error creating default admin user: {e}")
+            return None
+    return None
+
+def associate_existing_data_with_user(user_id):
+    """Associate existing projects and time entries with a user for data isolation"""
+    try:
+        # Associate all existing projects with the user if they don't have a user_id
+        projects = Project.query.filter(Project.user_id.is_(None)).all()
+        for project in projects:
+            project.user_id = user_id
+            
+        # Associate all existing time entries with the user if they don't have a user_id
+        time_entries = TimeEntry.query.filter(TimeEntry.user_id.is_(None)).all()
+        for entry in time_entries:
+            entry.user_id = user_id
+            
+        db.session.commit()
+        print(f"Associated {len(projects)} projects and {len(time_entries)} time entries with user ID {user_id}")
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error associating existing data with user: {e}")
 
 def get_setting(key, default_value=None):
     """Helper function to get a setting value"""

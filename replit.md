@@ -102,6 +102,31 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### July 24, 2025 - Login System Implementation
+Added comprehensive user authentication and authorization system with data isolation between users.
+
+#### New Core Features:
+1. **User Authentication**: Secure login system with password hashing
+2. **Data Isolation**: Users can only access their own projects and time entries
+3. **Admin User Management**: Admin users can view and delete other users
+4. **Default Admin User**: Automatic creation of default admin user "Joemar" with password "110291"
+5. **Session Management**: Secure session handling for authenticated users
+
+#### Enhanced Features:
+- All existing features now require authentication
+- Admin users have access to user management interface
+- Existing data automatically associated with default admin user
+- Navigation updated with login/logout functionality
+- Admin users can access user management section
+
+#### Technical Improvements:
+- Added User model with password hashing using Werkzeug
+- Implemented login_required and admin_required decorators
+- Added user_id foreign keys to Project and TimeEntry models for data isolation
+- Created login and admin user management templates
+- Updated all routes to filter data by user for proper isolation
+- Added database migration script for new users table and user_id columns
+
 ### July 24, 2025 - Major Feature Enhancement
 Added comprehensive bonus features from original requirements:
 

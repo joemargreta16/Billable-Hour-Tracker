@@ -82,14 +82,14 @@
                         </table>
                     </div>
                 {% else %}
-                    <div class="text-center text-muted py-5">
-                        <i data-feather="folder" class="mb-3" style="width: 3rem; height: 3rem;"></i>
-                        <h5>No Projects Found</h5>
-                        <p>Get started by creating your first project.</p>
-                        <a href="{{ url_for('add_project_page') }}" class="btn btn-primary">
-                            <i data-feather="plus" class="me-1"></i>Add Your First Project
-                        </a>
-                    </div>
+<div class="text-center text-muted py-5">
+    <i data-feather="folder" class="mb-3" style="width: 3rem; height: 3rem;"></i>
+    <h5>No Projects Found</h5>
+    <p>Get started by creating your first project.</p>
+    <a href="{{ url_for('add_project_page') }}" class="btn btn-primary">
+        <i data-feather="plus" class="me-1"></i>Add Your First Project
+    </a>
+</div>
                 {% endif %}
             </div>
         </div>

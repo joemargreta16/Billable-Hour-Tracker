@@ -1,6 +1,8 @@
-from flask import render_template, request, redirect, url_for, flash, jsonify, Response, make_response
+from flask import render_template, request, redirect, url_for, flash, jsonify, Response, make_response, session
 from app import app, db
-from models import TimeEntry, Project, Settings, get_setting, set_setting
+import logging
+from app import app, db
+from models import User, TimeEntry, Project, Settings, get_setting, set_setting
 from utils import (
     get_current_monthly_cycle, 
     get_monthly_cycle_for_date, 
@@ -15,7 +17,51 @@ from sqlalchemy import func, and_, or_
 import csv
 import io
 
+def login_required(f):
+    """Decorator to require login for routes"""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Please log in to access this page.', 'error')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    """Decorator to require admin privileges for routes"""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Please log in to access this page.', 'error')
+            return redirect(url_for('login'))
+        user = User.query.get(session['user_id'])
+        if not user or not user.is_admin:
+            flash('Access denied. Administrator privileges required.', 'error')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def get_current_user():
+    """Get the current logged-in user"""
+    if 'user_id' in session:
+        return User.query.get(session['user_id'])
+    return None
+
+def filter_by_user(query, user_field='user_id'):
+    """Filter query results by current user for data isolation"""
+    user = get_current_user()
+    if user and not user.is_admin:
+        return query.filter(getattr(query, user_field) == user.id)
+    return query
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 @app.route('/')
+@login_required
 def dashboard():
     """Main dashboard showing current cycle statistics with date range filter"""
     start_date_str = request.args.get('start_date')
@@ -32,33 +78,46 @@ def dashboard():
     else:
         start_date, end_date, cycle_name = get_current_monthly_cycle()
     
+    # Get current user for data isolation
+    current_user = get_current_user()
+    
     # Get monthly goal
     monthly_goal = float(get_setting('monthly_goal_hours', '160'))
     
-    # Calculate total billable hours for current cycle
+    # Calculate total billable hours for current cycle (filtered by user)
+    time_query = TimeEntry.query
+    if current_user and not current_user.is_admin:
+        time_query = time_query.filter(TimeEntry.user_id == current_user.id)
+    
     total_hours = db.session.query(func.sum(TimeEntry.hours)).filter(
         and_(
             TimeEntry.date >= start_date,
             TimeEntry.date <= end_date
         )
-    ).scalar() or 0.0
+    )
     
-    # Calculate remaining hours
-    remaining_hours = max(0, monthly_goal - total_hours)
+    # Apply user filter to the query
+    if current_user and not current_user.is_admin:
+        total_hours = total_hours.filter(TimeEntry.user_id == current_user.id)
     
-    # Calculate progress percentage
-    progress_percentage = min(100, (total_hours / monthly_goal) * 100) if monthly_goal > 0 else 0
+    total_hours = total_hours.scalar() or 0.0
     
-    # Get recent entries (last 10)
-    recent_entries = TimeEntry.query.filter(
+    # Get recent entries (last 10) (filtered by user)
+    recent_entries_query = TimeEntry.query.filter(
         and_(
             TimeEntry.date >= start_date,
             TimeEntry.date <= end_date
         )
-    ).order_by(TimeEntry.date.desc(), TimeEntry.created_at.desc()).limit(10).all()
+    ).order_by(TimeEntry.date.desc(), TimeEntry.created_at.desc()).limit(10)
     
-    # Get daily totals for current cycle
-    daily_totals = db.session.query(
+    # Apply user filter to the query
+    if current_user and not current_user.is_admin:
+        recent_entries_query = recent_entries_query.filter(TimeEntry.user_id == current_user.id)
+    
+    recent_entries = recent_entries_query.all()
+    
+    # Get daily totals for current cycle (filtered by user)
+    daily_totals_query = db.session.query(
         TimeEntry.date,
         func.sum(TimeEntry.hours).label('total_hours')
     ).filter(
@@ -66,7 +125,13 @@ def dashboard():
             TimeEntry.date >= start_date,
             TimeEntry.date <= end_date
         )
-    ).group_by(TimeEntry.date).order_by(TimeEntry.date.desc()).all()
+    ).group_by(TimeEntry.date).order_by(TimeEntry.date.desc())
+    
+    # Apply user filter to the query
+    if current_user and not current_user.is_admin:
+        daily_totals_query = daily_totals_query.filter(TimeEntry.user_id == current_user.id)
+    
+    daily_totals = daily_totals_query.all()
     
     # Calculate working days in cycle and working days completed
     total_days = (end_date - start_date).days + 1
@@ -94,76 +159,120 @@ def dashboard():
                          available_cycles=available_cycles,
                          current_month=current_month)
 
+
 @app.route('/entries')
 @app.route('/entries/<cycle_date>')
+@login_required
 def entries(cycle_date=None):
     """View all entries with filters for cycle, week, and project"""
-    # Parse query parameters
-    cycle_date_param = request.args.get('cycle_date') or cycle_date
-    week_param = request.args.get('week')
-    project_id_param = request.args.get('project_id')
-    
-    # Determine date range based on cycle_date or week
-    if cycle_date_param:
-        try:
-            target_date = datetime.strptime(cycle_date_param, '%Y-%m-%d').date()
-            start_date, end_date, cycle_name = get_monthly_cycle_for_date(target_date)
-        except ValueError:
-            flash('Invalid date format', 'error')
-            return redirect(url_for('entries'))
-    elif week_param:
-        try:
-            year, week_num = map(int, week_param.split('-W'))
-            # Calculate start and end dates of the week (Monday to Sunday)
-            start_date = datetime.strptime(f'{year}-W{week_num - 1}-1', "%Y-W%W-%w").date()
-            end_date = start_date + timedelta(days=6)
-            cycle_name = f"Week {week_num}, {year}"
-        except Exception:
-            flash('Invalid week format', 'error')
-            return redirect(url_for('entries'))
-    else:
-        start_date, end_date, cycle_name = get_current_monthly_cycle()
-    
-    # Build query with filters
-    query = TimeEntry.query.filter(
-        and_(
-            TimeEntry.date >= start_date,
-            TimeEntry.date <= end_date
-        )
-    )
-    
-    if project_id_param:
-        query = query.filter(TimeEntry.project_id == project_id_param)
-    
-    entries = query.order_by(TimeEntry.date.desc(), TimeEntry.created_at.desc()).all()
-    
-    # Calculate total hours for the filtered entries
-    total_hours = sum(entry.hours for entry in entries)
-    
-    # Group entries by date for display
-    entries_by_date = {}
-    for entry in entries:
-        date_key = entry.date
-        if date_key not in entries_by_date:
-            entries_by_date[date_key] = []
-        entries_by_date[date_key].append(entry)
-    
-    # Get available cycles and projects for filters
-    available_cycles = get_previous_cycles(12)
-    projects = Project.query.filter_by(active=True).order_by(Project.name).all()
-    
-    return render_template('entries.html',
-                         entries_by_date=entries_by_date,
-                         cycle_name=cycle_name,
-                         start_date=start_date,
-                         end_date=end_date,
-                         total_hours=total_hours,
-                         available_cycles=available_cycles,
-                         current_cycle_date=start_date,
-                         decimal_to_hours_minutes=decimal_to_hours_minutes,
-                         projects=projects)
+    try:
+        # Get filter parameters
+        cycle_date_param = request.args.get('cycle_date') or cycle_date
+        week_param = request.args.get('week')
+        project_id_param = request.args.get('project_id')
+        
+        # Get current user for data isolation
+        current_user = get_current_user()
+        
+        # Determine date range
+        if week_param:
+            try:
+                year, week_num = map(int, week_param.split('-W'))
+                start_date = datetime.strptime(f'{year}-W{week_num - 1}-1', "%Y-W%W-%w").date()
+                end_date = start_date + timedelta(days=6)
+                cycle_name = f"Week {week_num}, {year}"
+            except ValueError:
+                flash('Invalid week format. Use YYYY-WNN (e.g. 2023-W05)', 'error')
+                return redirect(url_for('entries'))
+        elif cycle_date_param:
+            try:
+                target_date = datetime.strptime(cycle_date_param, '%Y-%m-%d').date()
+                cycle_data = get_monthly_cycle_for_date(target_date)
+                
+                # Handle both tuple and object returns
+                if hasattr(cycle_data, 'start_date'):  # If it's a Cycle object
+                    start_date = cycle_data.start_date
+                    end_date = cycle_data.end_date
+                    cycle_name = cycle_data.name
+                else:  # If it's a tuple
+                    start_date, end_date, cycle_name = cycle_data
+            except (ValueError, TypeError) as e:
+                logger.error(f"Date processing error: {e}")
+                flash('Invalid date format or cycle data', 'error')
+                return redirect(url_for('entries'))
+        else:
+            cycle_data = get_current_monthly_cycle()
+            # Handle both tuple and object returns
+            if hasattr(cycle_data, 'start_date'):
+                start_date = cycle_data.start_date
+                end_date = cycle_data.end_date
+                cycle_name = cycle_data.name
+            else:
+                start_date, end_date, cycle_name = cycle_data
+
+        # Build query
+        query = TimeEntry.query.filter(
+            TimeEntry.date.between(start_date, end_date)
+        ).order_by(TimeEntry.date.desc(), TimeEntry.created_at.desc())
+        
+        # Apply user filter for data isolation
+        if current_user and not current_user.is_admin:
+            query = query.filter(TimeEntry.user_id == current_user.id)
+        
+        # Apply project filter if specified
+        if project_id_param and project_id_param.isdigit():
+            query = query.filter(TimeEntry.project_id == int(project_id_param))
+        
+        # Execute query
+        entries = query.all()
+        
+        # Group entries by date
+        entries_by_date = {}
+        for entry in entries:
+            if entry.date not in entries_by_date:
+                entries_by_date[entry.date] = []
+            entries_by_date[entry.date].append(entry)
+        
+        # Calculate total hours
+        total_hours = sum(entry.hours for entry in entries)
+        
+        # Get available cycles - convert Cycle objects to tuples if needed
+        available_cycles = []
+        for cycle in get_previous_cycles(12):
+            if hasattr(cycle, 'start_date'):  # It's a Cycle object
+                available_cycles.append((
+                    cycle.start_date,
+                    cycle.end_date,
+                    cycle.name
+                ))
+            else:  # It's already a tuple
+                available_cycles.append(cycle)
+        
+        # Get projects filtered by user for non-admin users
+        projects_query = Project.query.filter_by(active=True).order_by(Project.name)
+        if current_user and not current_user.is_admin:
+            projects_query = projects_query.filter(Project.user_id == current_user.id)
+        projects = projects_query.all()
+        
+        return render_template('entries.html',
+                            entries_by_date=entries_by_date,
+                            cycle_name=cycle_name,
+                            start_date=start_date,
+                            end_date=end_date,
+                            total_hours=total_hours,
+                            available_cycles=available_cycles,
+                            current_cycle_date=start_date,
+                            decimal_to_hours_minutes=decimal_to_hours_minutes,
+                            projects=projects)
+        
+    except Exception as e:
+        logger.error(f"Error in entries route: {str(e)}", exc_info=True)
+        flash(f'An error occurred while loading entries: {str(e)}', 'error')
+        return redirect(url_for('dashboard'))
+
 
 @app.route('/add_entry', methods=['GET', 'POST'])
+@login_required
 def add_entry():
     """Add a new time entry"""
     stay_on_page = request.args.get('stay', 'false').lower() == 'true'
@@ -174,6 +283,9 @@ def add_entry():
         hours_str = request.form.get('hours')
         description = request.form.get('description', '').strip()
         stay_on_page = request.form.get('stay_on_page') == 'true'
+        
+        # Get current user for data isolation
+        current_user = get_current_user()
         
         # Validate data
         errors = []
@@ -190,6 +302,10 @@ def add_entry():
             project = Project.query.get(project_id)
             if not project:
                 errors.append('Invalid project selected')
+            # Check if user has access to this project (for non-admin users)
+            elif current_user and not current_user.is_admin:
+                if project.user_id != current_user.id:
+                    errors.append('You do not have access to this project')
         
         # Validate hours
         hours = hours_to_decimal(hours_str)
@@ -209,6 +325,9 @@ def add_entry():
                 new_entry.project_id = int(project_id) if project_id else None
                 new_entry.hours = hours
                 new_entry.description = description
+                # Associate entry with current user
+                if current_user:
+                    new_entry.user_id = current_user.id
                 db.session.add(new_entry)
                 db.session.commit()
                 flash('Time entry added successfully!', 'success')
@@ -220,8 +339,12 @@ def add_entry():
                 db.session.rollback()
                 flash(f'Error adding entry: {str(e)}', 'error')
     
-    # Get active projects for the form
-    projects = Project.query.filter_by(active=True).order_by(Project.name).all()
+    # Get active projects for the form (filtered by user for non-admin users)
+    current_user = get_current_user()
+    projects_query = Project.query.filter_by(active=True).order_by(Project.name)
+    if current_user and not current_user.is_admin:
+        projects_query = projects_query.filter(Project.user_id == current_user.id)
+    projects = projects_query.all()
     
     # Default to today's date
     default_date = format_date_for_input(date.today())
@@ -231,9 +354,17 @@ def add_entry():
                          default_date=default_date)
 
 @app.route('/edit_entry/<int:entry_id>', methods=['GET', 'POST'])
+@login_required
 def edit_entry(entry_id):
     """Edit an existing time entry"""
-    entry = TimeEntry.query.get_or_404(entry_id)
+    # Get current user for data isolation
+    current_user = get_current_user()
+    
+    # Get entry with user filter for non-admin users
+    entry_query = TimeEntry.query
+    if current_user and not current_user.is_admin:
+        entry_query = entry_query.filter(TimeEntry.user_id == current_user.id)
+    entry = entry_query.get_or_404(entry_id)
     
     if request.method == 'POST':
         # Get form data
@@ -257,6 +388,10 @@ def edit_entry(entry_id):
             project = Project.query.get(project_id)
             if not project:
                 errors.append('Invalid project selected')
+            # Check if user has access to this project (for non-admin users)
+            elif current_user and not current_user.is_admin:
+                if project.user_id != current_user.id:
+                    errors.append('You do not have access to this project')
         
         # Validate hours
         hours = hours_to_decimal(hours_str)
@@ -283,8 +418,11 @@ def edit_entry(entry_id):
                 db.session.rollback()
                 flash(f'Error updating entry: {str(e)}', 'error')
     
-    # Get active projects for the form
-    projects = Project.query.filter_by(active=True).order_by(Project.name).all()
+    # Get active projects for the form (filtered by user for non-admin users)
+    projects_query = Project.query.filter_by(active=True).order_by(Project.name)
+    if current_user and not current_user.is_admin:
+        projects_query = projects_query.filter(Project.user_id == current_user.id)
+    projects = projects_query.all()
     
     return render_template('edit_entry.html', 
                          entry=entry, 
@@ -293,9 +431,17 @@ def edit_entry(entry_id):
                          decimal_to_hours_minutes=decimal_to_hours_minutes)
 
 @app.route('/delete_entry/<int:entry_id>', methods=['POST'])
+@login_required
 def delete_entry(entry_id):
     """Delete a time entry"""
-    entry = TimeEntry.query.get_or_404(entry_id)
+    # Get current user for data isolation
+    current_user = get_current_user()
+    
+    # Get entry with user filter for non-admin users
+    entry_query = TimeEntry.query
+    if current_user and not current_user.is_admin:
+        entry_query = entry_query.filter(TimeEntry.user_id == current_user.id)
+    entry = entry_query.get_or_404(entry_id)
     
     try:
         db.session.delete(entry)
@@ -308,6 +454,7 @@ def delete_entry(entry_id):
     return redirect(url_for('entries'))
 
 @app.route('/settings', methods=['GET', 'POST'])
+@login_required
 def settings():
     """Application settings page"""
     if request.method == 'POST':
@@ -330,17 +477,29 @@ def settings():
     # Get current settings
     current_goal = get_setting('monthly_goal_hours', '160')
     
-    # Get projects for management
-    projects = Project.query.order_by(Project.name).all()
+    # Get projects for management (filtered by user for non-admin users)
+    current_user = get_current_user()
+    projects_query = Project.query.order_by(Project.name)
+    if current_user and not current_user.is_admin:
+        projects_query = projects_query.filter(Project.user_id == current_user.id)
+    projects = projects_query.all()
     
     return render_template('settings.html', 
                          monthly_goal=current_goal,
                          projects=projects)
 
 @app.route('/toggle_project/<int:project_id>', methods=['POST'])
+@login_required
 def toggle_project(project_id):
     """Toggle project active status"""
-    project = Project.query.get_or_404(project_id)
+    # Get current user for data isolation
+    current_user = get_current_user()
+    
+    # Get project with user filter for non-admin users
+    project_query = Project.query
+    if current_user and not current_user.is_admin:
+        project_query = project_query.filter(Project.user_id == current_user.id)
+    project = project_query.get_or_404(project_id)
     
     try:
         project.active = not project.active
@@ -354,6 +513,7 @@ def toggle_project(project_id):
     return redirect(url_for('settings'))
 
 @app.route('/add_project', methods=['POST'])
+@login_required
 def add_project():
     """Add a new project"""
     name = request.form.get('name', '').strip()
@@ -373,6 +533,10 @@ def add_project():
         new_project = Project()
         new_project.name = name
         new_project.description = description
+        # Associate project with current user
+        current_user = get_current_user()
+        if current_user:
+            new_project.user_id = current_user.id
         db.session.add(new_project)
         db.session.commit()
         flash(f'Project "{name}" added successfully!', 'success')
@@ -383,9 +547,17 @@ def add_project():
     return redirect(url_for('settings'))
 
 @app.route('/delete_project/<int:project_id>', methods=['POST'])
+@login_required
 def delete_project(project_id):
     """Delete a project and its associated time entries"""
-    project = Project.query.get_or_404(project_id)
+    # Get current user for data isolation
+    current_user = get_current_user()
+    
+    # Get project with user filter for non-admin users
+    project_query = Project.query
+    if current_user and not current_user.is_admin:
+        project_query = project_query.filter(Project.user_id == current_user.id)
+    project = project_query.get_or_404(project_id)
 
     try:
         # The 'delete-orphan' cascade will handle deleting associated time entries
@@ -399,9 +571,17 @@ def delete_project(project_id):
     return redirect(url_for('settings'))
 
 @app.route('/edit_project/<int:project_id>', methods=['POST'])
+@login_required
 def edit_project(project_id):
     """Edit an existing project"""
-    project = Project.query.get_or_404(project_id)
+    # Get current user for data isolation
+    current_user = get_current_user()
+    
+    # Get project with user filter for non-admin users
+    project_query = Project.query
+    if current_user and not current_user.is_admin:
+        project_query = project_query.filter(Project.user_id == current_user.id)
+    project = project_query.get_or_404(project_id)
 
     name = request.form.get('name', '').strip()
     description = request.form.get('description', '').strip()
@@ -410,8 +590,12 @@ def edit_project(project_id):
         flash('Project name is required', 'error')
         return redirect(url_for('settings'))
 
-    # Check if another project with the same name already exists
-    existing_project = Project.query.filter(Project.name == name, Project.id != project_id).first()
+    # Check if another project with the same name already exists (for this user)
+    existing_project_query = Project.query.filter(Project.name == name, Project.id != project_id)
+    if current_user and not current_user.is_admin:
+        existing_project_query = existing_project_query.filter(Project.user_id == current_user.id)
+    existing_project = existing_project_query.first()
+    
     if existing_project:
         flash('A project with this name already exists', 'error')
         return redirect(url_for('settings'))
@@ -636,8 +820,19 @@ def search_entries():
 @app.route('/reports')
 def reports():
     """Advanced reports and analytics"""
-    # Get current cycle data
-    start_date, end_date, cycle_name = get_current_monthly_cycle()
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+    
+    if start_date_str and end_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            cycle_name = f"{start_date.strftime('%b %d, %Y')} - {end_date.strftime('%b %d, %Y')}"
+        except ValueError:
+            flash('Invalid date format. Please use YYYY-MM-DD.', 'error')
+            return redirect(url_for('reports'))
+    else:
+        start_date, end_date, cycle_name = get_current_monthly_cycle()
     
     # Get project statistics
     project_stats = db.session.query(
@@ -690,15 +885,32 @@ def reports():
                          decimal_to_hours_minutes=decimal_to_hours_minutes)
 
 @app.route('/projects')
+@login_required
 def projects():
     """List all projects for management"""
-    projects = Project.query.order_by(Project.created_at.desc()).all()
+    # Get current user for data isolation
+    current_user = get_current_user()
+    
+    # Get projects filtered by user for non-admin users
+    projects_query = Project.query.order_by(Project.created_at.desc())
+    if current_user and not current_user.is_admin:
+        projects_query = projects_query.filter(Project.user_id == current_user.id)
+    projects = projects_query.all()
+    
     return render_template('projects.html', projects=projects)
 
 @app.route('/project/edit/<int:project_id>', methods=['GET', 'POST'])
+@login_required
 def edit_project_page(project_id):
     """Render and process editing a project"""
-    project = Project.query.get_or_404(project_id)
+    # Get current user for data isolation
+    current_user = get_current_user()
+    
+    # Get project with user filter for non-admin users
+    project_query = Project.query
+    if current_user and not current_user.is_admin:
+        project_query = project_query.filter(Project.user_id == current_user.id)
+    project = project_query.get_or_404(project_id)
     
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
@@ -708,29 +920,34 @@ def edit_project_page(project_id):
             flash('Project name is required.', 'error')
             return redirect(url_for('edit_project_page', project_id=project_id))
         
-        # Check for duplicate names
-        existing_project = Project.query.filter(Project.name == name, Project.id != project_id).first()
+        # Check for duplicate names (for this user)
+        existing_project_query = Project.query.filter(Project.name == name, Project.id != project_id)
+        if current_user and not current_user.is_admin:
+            existing_project_query = existing_project_query.filter(Project.user_id == current_user.id)
+        existing_project = existing_project_query.first()
+        
         if existing_project:
             flash('A project with this name already exists.', 'error')
             return redirect(url_for('edit_project_page', project_id=project_id))
         
-    try:
-        project.name = name
-        project.description = description
-        # Handle missing updated_at column gracefully
-        if hasattr(project, 'updated_at'):
-            project.updated_at = datetime.utcnow()
-        db.session.commit()
-        flash('Project updated successfully!', 'success')
-        return redirect(url_for('projects'))
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error updating project: {str(e)}', 'error')
-        return redirect(url_for('edit_project_page', project_id=project_id))
+        try:
+            project.name = name
+            project.description = description
+            # Handle missing updated_at column gracefully
+            if hasattr(project, 'updated_at'):
+                project.updated_at = datetime.utcnow()
+            db.session.commit()
+            flash('Project updated successfully!', 'success')
+            return redirect(url_for('projects'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating project: {str(e)}', 'error')
+            return redirect(url_for('edit_project_page', project_id=project_id))
     
     return render_template('edit_project.html', project=project)
 
 @app.route('/project/add', methods=['GET', 'POST'])
+@login_required
 def add_project_page():
     """Add a new project via dedicated page"""
     if request.method == 'POST':
@@ -741,8 +958,13 @@ def add_project_page():
             flash('Project name is required.', 'error')
             return redirect(url_for('add_project_page'))
         
-        # Check if project already exists
-        existing_project = Project.query.filter_by(name=name).first()
+        # Check if project already exists (for this user)
+        current_user = get_current_user()
+        existing_project_query = Project.query.filter_by(name=name)
+        if current_user and not current_user.is_admin:
+            existing_project_query = existing_project_query.filter(Project.user_id == current_user.id)
+        existing_project = existing_project_query.first()
+        
         if existing_project:
             flash('A project with this name already exists.', 'error')
             return redirect(url_for('add_project_page'))
@@ -751,6 +973,9 @@ def add_project_page():
             new_project = Project()
             new_project.name = name
             new_project.description = description
+            # Associate project with current user
+            if current_user:
+                new_project.user_id = current_user.id
             db.session.add(new_project)
             db.session.commit()
             flash(f'Project "{name}" added successfully!', 'success')
@@ -792,9 +1017,79 @@ def api_cycle_stats(cycle_date):
 
 @app.errorhandler(404)
 def not_found_error(error):
+    logger.warning(f"404 Not Found: {request.path}")
+    if request.path.startswith('/entries'):
+        return redirect(url_for('entries'))
     return render_template('base.html'), 404
 
 @app.errorhandler(500)
 def internal_error(error):
     db.session.rollback()
+    logger.error(f"500 Internal Server Error: {error}")
     return render_template('base.html'), 500
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """User login page"""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if not username or not password:
+            flash('Please provide both username and password.', 'error')
+            return render_template('login.html')
+        
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.check_password(password):
+            session['user_id'] = user.id
+            session['username'] = user.username
+            session['is_admin'] = user.is_admin
+            flash('Logged in successfully.', 'success')
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Invalid username or password.', 'error')
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    """User logout"""
+    session.clear()
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('login'))
+
+@app.route('/admin/users')
+@admin_required
+def admin_users():
+    """Admin page to view and manage users"""
+    users = User.query.all()
+    return render_template('admin_users.html', users=users)
+
+@app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
+@admin_required
+def admin_delete_user(user_id):
+    """Admin route to delete a user"""
+    user = User.query.get_or_404(user_id)
+    
+    # Prevent deletion of the last admin user
+    if user.is_admin:
+        admin_count = User.query.filter_by(is_admin=True).count()
+        if admin_count <= 1:
+            flash('Cannot delete the last admin user.', 'error')
+            return redirect(url_for('admin_users'))
+    
+    # Prevent users from deleting themselves
+    if user.id == session['user_id']:
+        flash('You cannot delete your own account.', 'error')
+        return redirect(url_for('admin_users'))
+    
+    try:
+        db.session.delete(user)
+        db.session.commit()
+        flash(f'User {user.username} deleted successfully.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting user: {str(e)}', 'error')
+    
+    return redirect(url_for('admin_users'))

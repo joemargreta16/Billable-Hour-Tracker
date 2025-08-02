@@ -1,49 +1,65 @@
-import os
-import logging
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
-from werkzeug.middleware.proxy_fix import ProxyFix
-from flask_migrate import Migrate
+{% extends "base.html" %}
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
+{% block title %}Dashboard - Time Tracker{% endblock %}
 
-class Base(DeclarativeBase):
-    pass
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="mb-0">Dashboard</h1>
+        <p class="lead">Current Cycle: {{ cycle_name }}</p>
+    </div>
+</div>
 
-db = SQLAlchemy(model_class=Base)
-migrate = Migrate()
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card stats-card p-3">
+            <h5>Summary</h5>
+            <ul class="list-unstyled mb-0">
+                <li><strong>Total Hours:</strong> {{ total_hours }}</li>
+                <li><strong>Monthly Goal:</strong> {{ monthly_goal }}</li>
+                <li><strong>Remaining Hours:</strong> {{ remaining_hours }}</li>
+                <li><strong>Progress:</strong> {{ "%.2f"|format(progress_percentage) }}%</li>
+            </ul>
+        </div>
+    </div>
+</div>
 
-# Create the app
-app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h5>Recent Entries</h5>
+            {% if recent_entries %}
+                <ul class="list-group list-group-flush">
+                {% for entry in recent_entries %}
+                    <li class="list-group-item">
+                        {{ entry.date }} - {{ entry.project.name if entry.project else 'No Project' }} - {{ entry.hours }} hours
+                    </li>
+                {% endfor %}
+                </ul>
+            {% else %}
+                <p>No recent entries.</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h5>Daily Totals</h5>
+            {% if daily_totals %}
+                <ul class="list-group list-group-flush">
+                {% for day in daily_totals %}
+                    <li class="list-group-item">
+                        {{ day.date }}: {{ day.total_hours }} hours
+                    </li>
+                {% endfor %}
+                </ul>
+            {% else %}
+                <p>No daily totals available.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
 
-# Configure the database
-database_url = os.environ.get("DATABASE_URL", "sqlite:///timetracker.db")
-app.config["SQLALCHEMY_DATABASE_URI"] = database_url
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
-    "pool_pre_ping": True,
-}
-
-# Initialize the app with the extension
-db.init_app(app)
-migrate.init_app(app, db)
-
-# Import routes after app initialization
-with app.app_context():
-    import routes
-
-@app.cli.command("init-db")
-def init_db_command():
-    """Initializes the database."""
-    import models
-    db.create_all()
-    models.initialize_default_data()
-    print("Database initialized.")
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+<footer>
+    <a href="{{ url_for('entries') }}" class="btn btn-primary">View All Entries</a>
+</footer>
+{% endblock %}
