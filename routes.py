@@ -724,15 +724,44 @@ def reports():
         )
     ).group_by(func.extract('dow', TimeEntry.date)).all()
     
+    # Additional data for new charts
+    # Get daily totals for heatmap (date and total hours)
+    daily_totals = db.session.query(
+        TimeEntry.date,
+        func.sum(TimeEntry.hours).label('total_hours')
+    ).filter(
+        and_(
+            TimeEntry.date >= start_date,
+            TimeEntry.date <= end_date
+        )
+    ).group_by(TimeEntry.date).order_by(TimeEntry.date).all()
+    
+    # Get project totals by date for stacked bar chart
+    project_daily_totals = db.session.query(
+        TimeEntry.date,
+        Project.name,
+        func.sum(TimeEntry.hours).label('total_hours')
+    ).join(Project).filter(
+        and_(
+            TimeEntry.date >= start_date,
+            TimeEntry.date <= end_date
+        )
+    ).group_by(TimeEntry.date, Project.name).order_by(TimeEntry.date).all()
+    
     # Calculate efficiency metrics
     total_hours = sum(stat.total_hours for stat in project_stats)
     monthly_goal = float(get_setting('monthly_goal_hours', '160'))
+
+    # Debug logging for data counts
+    logger.debug(f"Reports data counts - Projects: {len(project_stats)}, Hourly: {len(hourly_stats)}, Weekly: {len(weekly_stats)}, Daily: {len(daily_totals)}, Project Daily: {len(project_daily_totals)}")
     
     return render_template('reports.html',
                          cycle_name=cycle_name,
                          project_stats=project_stats,
                          hourly_stats=hourly_stats,
                          weekly_stats=weekly_stats,
+                         daily_totals=daily_totals,
+                         project_daily_totals=project_daily_totals,
                          total_hours=total_hours,
                          monthly_goal=monthly_goal,
                          decimal_to_hours_minutes=decimal_to_hours_minutes)
