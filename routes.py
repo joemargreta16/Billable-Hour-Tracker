@@ -1045,15 +1045,21 @@ def login():
             return render_template('login.html')
         
         user = User.query.filter_by(username=username).first()
-        
-        if user and user.check_password(password):
-            session['user_id'] = user.id
-            session['username'] = user.username
-            session['is_admin'] = user.is_admin
-            flash('Logged in successfully.', 'success')
-            return redirect(url_for('dashboard'))
+        if user:
+            app.logger.debug(f"User found: {user.username}")
+            if user.check_password(password):
+                app.logger.debug("Password check passed")
+                session['user_id'] = user.id
+                session['username'] = user.username
+                session['is_admin'] = user.is_admin
+                flash('Logged in successfully.', 'success')
+                return redirect(url_for('dashboard'))
+            else:
+                app.logger.debug("Password check failed")
         else:
-            flash('Invalid username or password.', 'error')
+            app.logger.debug("User not found")
+        
+        flash('Invalid username or password.', 'error')
     
     return render_template('login.html')
 
