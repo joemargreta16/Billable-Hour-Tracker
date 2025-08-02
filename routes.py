@@ -1,7 +1,6 @@
 from flask import render_template, request, redirect, url_for, flash, jsonify, Response, make_response, session
 from app import app, db
 import logging
-from app import app, db
 from models import User, TimeEntry, Project, Settings, get_setting, set_setting
 from utils import (
     get_current_monthly_cycle, 
@@ -101,6 +100,12 @@ def dashboard():
         total_hours = total_hours.filter(TimeEntry.user_id == current_user.id)
     
     total_hours = total_hours.scalar() or 0.0
+    
+    # Calculate remaining hours
+    remaining_hours = max(0, monthly_goal - total_hours)
+    
+    # Calculate progress percentage
+    progress_percentage = min(100, (total_hours / monthly_goal) * 100) if monthly_goal > 0 else 0
     
     # Get recent entries (last 10) (filtered by user)
     recent_entries_query = TimeEntry.query.filter(
