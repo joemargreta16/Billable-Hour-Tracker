@@ -73,27 +73,27 @@ def logout():
     flash('Logged out successfully.')
     return redirect(url_for('login'))
 
-@app.route('/drop_user_table')
-def drop_user_table():
-    from sqlalchemy import text
-    try:
-        db.session.execute(text('DROP TABLE IF EXISTS "user";'))
-        db.session.commit()
-        return "User table dropped. Remove this route after use!"
-    except Exception as e:
-        print("Drop table error:", e)
-        return f"Error: {e}"
+# @app.route('/drop_user_table')
+# def drop_user_table():
+#     from sqlalchemy import text
+#     try:
+#         db.session.execute(text('DROP TABLE IF EXISTS "user";'))
+#         db.session.commit()
+#         return "User table dropped. Remove this route after use!"
+#     except Exception as e:
+#         print("Drop table error:", e)
+#         return f"Error: {e}"
 
-@app.route('/add_password_column')
-def add_password_column():
-    from sqlalchemy import text
-    try:
-        db.session.execute(text('ALTER TABLE "user" ADD COLUMN password VARCHAR(128);'))
-        db.session.commit()
-        return "Password column added to user table. Remove this route after use!"
-    except Exception as e:
-        print("Alter table error:", e)
-        return f"Error: {e}"
+# @app.route('/add_password_column')
+# def add_password_column():
+#     from sqlalchemy import text
+#     try:
+#         db.session.execute(text('ALTER TABLE "user" ADD COLUMN password VARCHAR(128);'))
+#         db.session.commit()
+#         return "Password column added to user table. Remove this route after use!"
+#     except Exception as e:
+#         print("Alter table error:", e)
+#         return f"Error: {e}"
 
 if __name__ == '__main__':
     app.run(debug=True)
