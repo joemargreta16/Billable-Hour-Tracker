@@ -747,6 +747,16 @@ def reports():
             TimeEntry.date <= end_date
         )
     ).group_by(TimeEntry.date, Project.name).order_by(TimeEntry.date).all()
+
+    # Convert project_daily_totals to list of dicts for JSON serialization
+    project_daily_totals = [
+        {
+            'date': item.date.strftime('%Y-%m-%d') if hasattr(item.date, 'strftime') else str(item.date),
+            'name': item.name,
+            'total_hours': float(item.total_hours) if item.total_hours is not None else 0.0
+        }
+        for item in project_daily_totals
+    ]
     
     # Calculate efficiency metrics
     total_hours = sum(stat.total_hours for stat in project_stats)
