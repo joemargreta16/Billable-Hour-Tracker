@@ -27,20 +27,25 @@ def home():
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
-        username = request.form['username'].strip()
-        password = request.form['password']
-        if not username or not password:
-            flash('Username and password required.')
+        try:
+            username = request.form['username'].strip()
+            password = request.form['password']
+            if not username or not password:
+                flash('Username and password required.')
+                return render_template('signup.html')
+            if User.query.filter_by(username=username).first():
+                flash('Username already exists.')
+                return render_template('signup.html')
+            hashed_pw = generate_password_hash(password)
+            new_user = User(username=username, password=hashed_pw)
+            db.session.add(new_user)
+            db.session.commit()
+            flash('Signup successful. Please log in.')
+            return redirect(url_for('login'))
+        except Exception as e:
+            print("Signup error:", e)  # This will show up in your Render logs
+            flash('An error occurred during signup.')
             return render_template('signup.html')
-        if User.query.filter_by(username=username).first():
-            flash('Username already exists.')
-            return render_template('signup.html')
-        hashed_pw = generate_password_hash(password)
-        new_user = User(username=username, password=hashed_pw)
-        db.session.add(new_user)
-        db.session.commit()
-        flash('Signup successful. Please log in.')
-        return redirect(url_for('login'))
     return render_template('signup.html')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -67,6 +72,13 @@ def logout():
     session.clear()
     flash('Logged out successfully.')
     return redirect(url_for('login'))
+
+@app.route('/drop_user_table')
+def drop_user_table():
+    from sqlalchemy import text
+    db.session.execute(text('DROP TABLE IF EXISTS "user";'))
+    db.session.commit()
+    return "User table dropped. Remove this route after use!"
 
 if __name__ == '__main__':
     app.run(debug=True)
