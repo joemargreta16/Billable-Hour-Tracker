@@ -14,8 +14,8 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(128), nullable=False)
 
-@app.before_first_request
-def create_tables():
+# Create tables at startup (Flask 3+ compatible)
+with app.app_context():
     db.create_all()
 
 @app.route('/')
