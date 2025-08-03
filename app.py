@@ -1,71 +1,62 @@
-import os
-import logging
-from flask import Flask
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
-from werkzeug.middleware.proxy_fix import ProxyFix
-from flask_migrate import Migrate
+from werkzeug.security import generate_password_hash, check_password_hash
 
-import sys
-import warnings
-
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-
-class Base(DeclarativeBase):
-    pass
-
-db = SQLAlchemy(model_class=Base)
-migrate = Migrate()
-
-# Create the app
 app = Flask(__name__)
+app.secret_key = 'your_secret_key'  # Change this to a random secret key
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
-# Check for critical environment variables
-session_secret = os.environ.get("SESSION_SECRET")
-if not session_secret or session_secret == "dev-secret-key-change-in-production":
-    warnings.warn("SESSION_SECRET is not set or using default. This is insecure for production.", RuntimeWarning)
-app.secret_key = session_secret or "dev-secret-key-change-in-production"
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password = db.Column(db.String(128), nullable=False)
 
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+@app.route('/')
+def home():
+    return redirect(url_for('login'))
 
-# Configure the database
-database_url = os.environ.get("DATABASE_URL")
-if not database_url:
-    warnings.warn("DATABASE_URL environment variable is not set. Falling back to local SQLite database.", RuntimeWarning)
-    database_url = "sqlite:///timetracker.db"
-else:
-    # Fix for old-style postgres URLs
-    if database_url.startswith("postgres://"):
-        database_url = database_url.replace("postgres://", "postgresql://", 1)
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        user = User.query.filter_by(username=username).first()
+        if user and check_password_hash(user.password, password):
+            session['user_id'] = user.id
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Invalid username or password')
+    return render_template('login.html')
 
-app.config["SQLALCHEMY_DATABASE_URI"] = database_url
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
-    "pool_pre_ping": True,
-}
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        if User.query.filter_by(username=username).first():
+            flash('Username already exists')
+        else:
+            hashed_password = generate_password_hash(password, method='sha256')
+            new_user = User(username=username, password=hashed_password)
+            db.session.add(new_user)
+            db.session.commit()
+            flash('Sign up successful! You can now log in.')
+            return redirect(url_for('login'))
+    return render_template('signup.html')
 
-# Initialize the app with the extension
-db.init_app(app)
-migrate.init_app(app, db)
+@app.route('/dashboard')
+def dashboard():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('dashboard.html')
 
-# Import routes after app initialization
-with app.app_context():
-    import routes
-
-@app.cli.command("init-db")
-def init_db_command():
-    """Initializes the database."""
-    import models
-    db.create_all()
-    models.initialize_default_data()
-    print("Database initialized.")
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8000))
-    debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"
-    try:
-        app.run(host='0.0.0.0', port=port, debug=debug_mode)
-    except Exception as e:
-        print(f"Error starting app: {e}", file=sys.stderr)
-        sys.exit(1)
+    db.create_all()  # Create database tables
+    app.run(debug=True)
