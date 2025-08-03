@@ -4,16 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign Up</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
         <h2>Sign Up</h2>
         {% with messages = get_flashed_messages() %}
             {% if messages %}
-                <div class="alert alert-danger">
-                    {{ messages[0] }}
-                </div>
+                <ul>
+                {% for msg in messages %}
+                  <li>{{ msg }}</li>
+                {% endfor %}
+                </ul>
             {% endif %}
         {% endwith %}
         <form method="POST">
