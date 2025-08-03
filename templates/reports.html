@@ -180,7 +180,7 @@
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">
-                    <i data-feather="bar-chart" class="me-2"></i>Project Daily Totals (Stacked Bar Chart)
+                    <i data-feather="bar-chart-2" class="me-2"></i>Project Daily Totals (Stacked Bar Chart)
                 </h5>
             </div>
             <div class="card-body">
@@ -188,8 +188,8 @@
                     <canvas id="projectDailyChart" height="300"></canvas>
                 {% else %}
                     <div class="text-center text-muted py-4">
-                        <i data-feather="bar-chart" class="mb-3" style="width: 3rem; height: 3rem;"></i>
-                        <p>No project daily totals data available</p>
+                    <i data-feather="bar-chart-2" class="mb-3" style="width: 3rem; height: 3rem;"></i>
+                    <p>No project daily totals data available</p>
                     </div>
                 {% endif %}
             </div>
@@ -283,25 +283,27 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        feather.replace();
-        
+        // Removed redundant feather.replace() call
+    
         // Initialize charts
         initializeProjectChart();
         initializeWeeklyChart();
         initializeHourlyChart();
-        
+        initializeProjectDailyChart();
+        initializeDailyTotalsHeatmap();
+    
         // Set default dates if not set
         const today = new Date().toISOString().split('T')[0];
         const startDate = document.getElementById('start_date');
         const endDate = document.getElementById('end_date');
-        
+    
         if (!startDate.value) {
             // Default to start of current month if no date is set
             const firstDay = new Date();
             firstDay.setDate(1);
             startDate.value = firstDay.toISOString().split('T')[0];
         }
-        
+    
         if (!endDate.value) {
             endDate.value = today;
         }
