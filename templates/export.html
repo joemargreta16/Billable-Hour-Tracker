@@ -11,7 +11,7 @@
                 <i data-feather="arrow-left" class="me-1"></i>Back to Dashboard
             </a>
         </div>
-        <p class="text-muted">Export your time tracking data to CSV format</p>
+<p class="text-muted">Export your time tracking data to CSV or PDF format</p>
     </div>
 </div>
 
@@ -79,7 +79,13 @@
                                 CSV (Comma Separated Values)
                             </label>
                         </div>
-                        <div class="form-text">Compatible with Excel, Google Sheets, and other spreadsheet applications</div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="format" id="pdf_format" value="pdf">
+                            <label class="form-check-label" for="pdf_format">
+                                PDF (Portable Document Format)
+                            </label>
+                        </div>
+                        <div class="form-text">Choose the format to export your data</div>
                     </div>
 
                     <!-- Include Options -->
@@ -102,7 +108,7 @@
                     <!-- Export Button -->
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">
-                            <i data-feather="download" class="me-1"></i>Export CSV
+                            <i data-feather="download" class="me-1"></i>Export
                         </button>
                         <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
                             <i data-feather="x" class="me-1"></i>Cancel

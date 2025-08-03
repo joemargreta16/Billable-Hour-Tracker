@@ -479,9 +479,13 @@ def export_page():
                          start_date=format_date_for_input(start_date),
                          end_date=format_date_for_input(end_date))
 
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import inch
+
 @app.route('/export_data', methods=['GET', 'POST'])
 def export_data():
-    """Export time tracking data to CSV"""
+    """Export time tracking data to CSV or PDF"""
     
     # Handle quick export via GET
     if request.method == 'GET':
@@ -492,12 +496,14 @@ def export_data():
             project_ids = None
             include_descriptions = True
             include_totals = True
+            export_format = 'csv'
         elif quick_type == 'all_data':
             start_date = None
             end_date = None
             project_ids = None
             include_descriptions = True
             include_totals = True
+            export_format = 'csv'
         else:
             return redirect(url_for('export_page'))
     else:
@@ -507,6 +513,7 @@ def export_data():
         project_ids = request.form.getlist('project_ids')
         include_descriptions = 'include_descriptions' in request.form
         include_totals = 'include_totals' in request.form
+        export_format = request.form.get('format', 'csv')
         
         start_date = parse_date_from_input(start_date_str) if start_date_str else None
         end_date = parse_date_from_input(end_date_str) if end_date_str else None
@@ -527,86 +534,178 @@ def export_data():
     # Get entries ordered by date
     entries = query.order_by(TimeEntry.date.desc(), TimeEntry.created_at.desc()).all()
     
-    # Create CSV content
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # Write headers
-    headers = ['Date', 'Project', 'Hours (Decimal)', 'Hours (HH:MM)']
-    if include_descriptions:
-        headers.append('Description')
-    headers.extend(['Created At', 'Updated At'])
-    writer.writerow(headers)
-    
-    # Write data rows
-    for entry in entries:
-        row = [
-            entry.date.strftime('%Y-%m-%d'),
-            entry.project.name,
-            f"{entry.hours:.2f}",
-            entry.hours_minutes_display
-        ]
+    if export_format == 'pdf':
+        # Generate PDF
+        buffer = io.BytesIO()
+        p = canvas.Canvas(buffer, pagesize=letter)
+        width, height = letter
+        
+        # Title
+        p.setFont("Helvetica-Bold", 16)
+        p.drawString(inch, height - inch, "Time Tracking Export")
+        
+        # Date range info
+        date_range_str = "All Data"
+        if start_date and end_date:
+            date_range_str = f"{start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
+        elif start_date:
+            date_range_str = f"From {start_date.strftime('%Y-%m-%d')}"
+        elif end_date:
+            date_range_str = f"Until {end_date.strftime('%Y-%m-%d')}"
+        p.setFont("Helvetica", 12)
+        p.drawString(inch, height - inch - 20, f"Date Range: {date_range_str}")
+        
+        # Table headers
+        y = height - inch - 50
+        p.setFont("Helvetica-Bold", 10)
+        headers = ['Date', 'Project', 'Hours (Decimal)', 'Hours (HH:MM)']
         if include_descriptions:
-            row.append(entry.description or '')
-        row.extend([
-            entry.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            entry.updated_at.strftime('%Y-%m-%d %H:%M:%S')
-        ])
-        writer.writerow(row)
-    
-    # Add totals if requested
-    if include_totals and entries:
-        writer.writerow([])  # Empty row
-        writer.writerow(['SUMMARY'])
+            headers.append('Description')
+        for i, header in enumerate(headers):
+            p.drawString(inch + i*100, y, header)
         
-        # Calculate project totals
-        project_totals = {}
-        total_hours = 0
-        
+        # Table rows
+        p.setFont("Helvetica", 10)
+        y -= 15
         for entry in entries:
-            project_name = entry.project.name
-            if project_name not in project_totals:
-                project_totals[project_name] = 0
-            project_totals[project_name] += entry.hours
-            total_hours += entry.hours
+            if y < inch:
+                p.showPage()
+                y = height - inch
+            row = [
+                entry.date.strftime('%Y-%m-%d'),
+                entry.project.name,
+                f"{entry.hours:.2f}",
+                entry.hours_minutes_display
+            ]
+            if include_descriptions:
+                row.append(entry.description or '')
+            for i, cell in enumerate(row):
+                p.drawString(inch + i*100, y, str(cell))
+            y -= 15
         
-        # Write project totals
-        for project_name, hours in project_totals.items():
+        # Totals if requested
+        if include_totals and entries:
+            if y < inch + 40:
+                p.showPage()
+                y = height - inch
+            y -= 10
+            p.setFont("Helvetica-Bold", 12)
+            p.drawString(inch, y, "SUMMARY")
+            y -= 15
+            
+            project_totals = {}
+            total_hours = 0
+            for entry in entries:
+                project_name = entry.project.name
+                if project_name not in project_totals:
+                    project_totals[project_name] = 0
+                project_totals[project_name] += entry.hours
+                total_hours += entry.hours
+            
+            p.setFont("Helvetica", 10)
+            for project_name, hours in project_totals.items():
+                if y < inch:
+                    p.showPage()
+                    y = height - inch
+                p.drawString(inch, y, f"TOTAL - {project_name}: {hours:.2f} ({decimal_to_hours_minutes(hours)})")
+                y -= 15
+            
+            if y < inch:
+                p.showPage()
+                y = height - inch
+            p.drawString(inch, y, f"GRAND TOTAL - All Projects: {total_hours:.2f} ({decimal_to_hours_minutes(total_hours)})")
+            y -= 15
+        
+        p.save()
+        buffer.seek(0)
+        
+        response = make_response(buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        filename = f"time_tracking_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+    
+    else:
+        # Create CSV content
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write headers
+        headers = ['Date', 'Project', 'Hours (Decimal)', 'Hours (HH:MM)']
+        if include_descriptions:
+            headers.append('Description')
+        headers.extend(['Created At', 'Updated At'])
+        writer.writerow(headers)
+        
+        # Write data rows
+        for entry in entries:
+            row = [
+                entry.date.strftime('%Y-%m-%d'),
+                entry.project.name,
+                f"{entry.hours:.2f}",
+                entry.hours_minutes_display
+            ]
+            if include_descriptions:
+                row.append(entry.description or '')
+            row.extend([
+                entry.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                entry.updated_at.strftime('%Y-%m-%d %H:%M:%S')
+            ])
+            writer.writerow(row)
+        
+        # Add totals if requested
+        if include_totals and entries:
+            writer.writerow([])  # Empty row
+            writer.writerow(['SUMMARY'])
+            
+            # Calculate project totals
+            project_totals = {}
+            total_hours = 0
+            
+            for entry in entries:
+                project_name = entry.project.name
+                if project_name not in project_totals:
+                    project_totals[project_name] = 0
+                project_totals[project_name] += entry.hours
+                total_hours += entry.hours
+            
+            # Write project totals
+            for project_name, hours in project_totals.items():
+                writer.writerow([
+                    'TOTAL',
+                    project_name,
+                    f"{hours:.2f}",
+                    decimal_to_hours_minutes(hours)
+                ])
+            
+            # Write grand total
             writer.writerow([
-                'TOTAL',
-                project_name,
-                f"{hours:.2f}",
-                decimal_to_hours_minutes(hours)
+                'GRAND TOTAL',
+                'All Projects',
+                f"{total_hours:.2f}",
+                decimal_to_hours_minutes(total_hours)
             ])
         
-        # Write grand total
-        writer.writerow([
-            'GRAND TOTAL',
-            'All Projects',
-            f"{total_hours:.2f}",
-            decimal_to_hours_minutes(total_hours)
-        ])
-    
-    # Create response
-    csv_content = output.getvalue()
-    output.close()
-    
-    # Generate filename
-    date_range = ""
-    if start_date and end_date:
-        date_range = f"_{start_date.strftime('%Y%m%d')}_to_{end_date.strftime('%Y%m%d')}"
-    elif start_date:
-        date_range = f"_from_{start_date.strftime('%Y%m%d')}"
-    elif end_date:
-        date_range = f"_until_{end_date.strftime('%Y%m%d')}"
-    
-    filename = f"time_tracking_export{date_range}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    
-    response = make_response(csv_content)
-    response.headers['Content-Type'] = 'text/csv'
-    response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
-    
-    return response
+        # Create response
+        csv_content = output.getvalue()
+        output.close()
+        
+        # Generate filename
+        date_range = ""
+        if start_date and end_date:
+            date_range = f"_{start_date.strftime('%Y%m%d')}_to_{end_date.strftime('%Y%m%d')}"
+        elif start_date:
+            date_range = f"_from_{start_date.strftime('%Y%m%d')}"
+        elif end_date:
+            date_range = f"_until_{end_date.strftime('%Y%m%d')}"
+        
+        filename = f"time_tracking_export{date_range}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        
+        response = make_response(csv_content)
+        response.headers['Content-Type'] = 'text/csv'
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        return response
 
 @app.route('/search')
 def search_entries():
