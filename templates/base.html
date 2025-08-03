@@ -153,22 +153,22 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('dashboard') }}" aria-current="page">
+                        <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
                             <i data-feather="home" class="me-1" aria-hidden="true"></i>Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link active" href="{{ url_for('entries') }}">
+                        <a class="nav-link {% if request.endpoint == 'entries' %}active{% endif %}" href="{{ url_for('entries') }}">
                             <i data-feather="list" class="me-1" aria-hidden="true"></i>Entries
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('add_entry') }}">
+                        <a class="nav-link {% if request.endpoint == 'add_entry' %}active{% endif %}" href="{{ url_for('add_entry') }}">
                             <i data-feather="plus" class="me-1" aria-hidden="true"></i>Add Entry
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('projects') }}">
+                        <a class="nav-link {% if request.endpoint == 'projects' %}active{% endif %}" href="{{ url_for('projects') }}">
                             <i data-feather="folder" class="me-1" aria-hidden="true"></i>Projects
                         </a>
                     </li>
@@ -194,6 +194,15 @@
                             <i data-feather="settings" class="me-1" aria-hidden="true"></i>Settings
                         </a>
                     </li>
+                    {% if session.get('username') %}
+                      <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+                      </li>
+                    {% else %}
+                      <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('login') }}">Login</a>
+                      </li>
+                    {% endif %}
                 </ul>
             </div>
         </div>
