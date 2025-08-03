@@ -84,5 +84,16 @@ def drop_user_table():
         print("Drop table error:", e)
         return f"Error: {e}"
 
+@app.route('/add_password_column')
+def add_password_column():
+    from sqlalchemy import text
+    try:
+        db.session.execute(text('ALTER TABLE "user" ADD COLUMN password VARCHAR(128);'))
+        db.session.commit()
+        return "Password column added to user table. Remove this route after use!"
+    except Exception as e:
+        print("Alter table error:", e)
+        return f"Error: {e}"
+
 if __name__ == '__main__':
     app.run(debug=True)
