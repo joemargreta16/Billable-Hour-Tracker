@@ -12,7 +12,7 @@ db = SQLAlchemy(app)
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    password = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
 
 # Create tables at startup (Flask 3+ compatible)
 with app.app_context():
@@ -37,7 +37,7 @@ def signup():
                 flash('Username already exists.')
                 return render_template('signup.html')
             hashed_pw = generate_password_hash(password)
-            new_user = User(username=username, password=hashed_pw)
+            new_user = User(username=username, password_hash=hashed_pw)
             db.session.add(new_user)
             db.session.commit()
             flash('Signup successful. Please log in.')
@@ -54,7 +54,7 @@ def login():
         username = request.form['username'].strip()
         password = request.form['password']
         user = User.query.filter_by(username=username).first()
-        if user and check_password_hash(user.password, password):
+        if user and check_password_hash(user.password_hash, password):
             session['user_id'] = user.id
             session['username'] = user.username
             return redirect(url_for('dashboard'))
