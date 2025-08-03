@@ -463,17 +463,9 @@
 
         {% if project_daily_totals %}
         // Prepare data
-        const dates = [...new Set([
-            {% for item in project_daily_totals %}
-                '{{ item.date }}',
-            {% endfor %}
-        ])];
-
-        const projects = [...new Set([
-            {% for item in project_daily_totals %}
-                '{{ item.name | replace("'", "\\'") }}',
-            {% endfor %}
-        ])];
+        const projectDailyTotals = {{ project_daily_totals | tojson }};
+        const dates = [...new Set(projectDailyTotals.map(item => item.date))];
+        const projects = [...new Set(projectDailyTotals.map(item => item.name))];
 
         // Initialize dataset for each project
         const datasets = projects.map(project => {
@@ -481,7 +473,7 @@
                 label: project,
                 data: dates.map(date => {
                     // Convert item.date to string for comparison
-                    const entry = project_daily_totals.find(item => (new Date(item.date).toISOString().split('T')[0]) === date && item.name === project);
+                    const entry = projectDailyTotals.find(item => item.date === date && item.name === project);
                     return entry ? entry.total_hours : 0;
                 }),
                 backgroundColor: getRandomColor(),
