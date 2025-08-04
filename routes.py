@@ -1,8 +1,8 @@
-from flask import render_template, request, redirect, url_for, flash, jsonify, Response, make_response
+from flask import render_template, request, redirect, url_for, flash, jsonify, Response, make_response, session
 from app import app, db
 import logging
 from app import app, db
-from models import TimeEntry, Project, Settings, get_setting, set_setting
+from models import TimeEntry, Project, Settings, get_setting, set_setting, User
 from utils import (
     get_current_monthly_cycle, 
     get_monthly_cycle_for_date, 
@@ -988,3 +988,74 @@ def internal_error(error):
     db.session.rollback()
     logger.error(f"500 Internal Server Error: {error}")
     return render_template('base.html'), 500
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Handle user login"""
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        
+        if not username or not password:
+            flash('Username and password are required', 'error')
+            return redirect(url_for('login'))
+        
+        # Find user
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.check_password(password):
+            session['username'] = username
+            flash('Logged in successfully!', 'success')
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Invalid username or password', 'error')
+            return redirect(url_for('login'))
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    """Handle user logout"""
+    session.pop('username', None)
+    flash('Logged out successfully!', 'success')
+    return redirect(url_for('login'))
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    """Handle user registration"""
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        
+        if not username or not password:
+            flash('Username and password are required', 'error')
+            return redirect(url_for('signup'))
+        
+        if len(username) < 3:
+            flash('Username must be at least 3 characters', 'error')
+            return redirect(url_for('signup'))
+        
+        if len(password) < 6:
+            flash('Password must be at least 6 characters', 'error')
+            return redirect(url_for('signup'))
+        
+        # Check if user already exists
+        existing_user = User.query.filter_by(username=username).first()
+        if existing_user:
+            flash('Username already exists', 'error')
+            return redirect(url_for('signup'))
+        
+        # Create new user
+        try:
+            new_user = User(username=username)
+            new_user.set_password(password)
+            db.session.add(new_user)
+            db.session.commit()
+            flash('Account created successfully! Please login.', 'success')
+            return redirect(url_for('login'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating account: {str(e)}', 'error')
+            return redirect(url_for('signup'))
+    
+    return render_template('signup.html')
