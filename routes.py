@@ -1,6 +1,7 @@
-from flask import render_template, request, redirect, url_for, flash, jsonify, Response, make_response, session
+from flask import render_template, request, redirect, url_for, flash, jsonify, Response, make_response, session, abort
 from app import app, db
 import logging
+from functools import wraps
 from app import app, db
 from models import TimeEntry, Project, Settings, get_setting, set_setting, User
 from utils import (
@@ -20,6 +21,38 @@ import io
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+# Helper functions for authentication
+def login_required(f):
+    """Decorator to require login for routes"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in session:
+            flash('Please login to access this page', 'error')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    """Decorator to require admin privileges for routes"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in session:
+            flash('Please login to access this page', 'error')
+            return redirect(url_for('login'))
+        
+        user = User.query.filter_by(username=session['username']).first()
+        if not user or not user.is_admin:
+            flash('Admin access required', 'error')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def get_current_user():
+    """Get the current logged-in user"""
+    if 'username' not in session:
+        return None
+    return User.query.filter_by(username=session['username']).first()
 
 @app.route('/')
 def dashboard():
@@ -41,13 +74,15 @@ def dashboard():
     # Get monthly goal
     monthly_goal = float(get_setting('monthly_goal_hours', '160'))
     
-    # Calculate total billable hours for current cycle
-    total_hours = db.session.query(func.sum(TimeEntry.hours)).filter(
-        and_(
-            TimeEntry.date >= start_date,
-            TimeEntry.date <= end_date
-        )
-    ).scalar() or 0.0
+        # Calculate total billable hours for current cycle
+        current_user = get_current_user()
+        total_hours = db.session.query(func.sum(TimeEntry.hours)).filter(
+            and_(
+                TimeEntry.date >= start_date,
+                TimeEntry.date <= end_date,
+                TimeEntry.user_id == current_user.id
+            )
+        ).scalar() or 0.0
     
     # Calculate remaining hours
     remaining_hours = max(0, monthly_goal - total_hours)
