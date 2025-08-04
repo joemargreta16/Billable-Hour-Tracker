@@ -76,6 +76,9 @@ def dashboard():
     
     # Calculate total billable hours for current cycle
     current_user = get_current_user()
+    if not current_user:
+        return redirect(url_for('login'))
+    
     total_hours = db.session.query(func.sum(TimeEntry.hours)).filter(
         and_(
             TimeEntry.date >= start_date,
@@ -94,7 +97,8 @@ def dashboard():
     recent_entries = TimeEntry.query.filter(
         and_(
             TimeEntry.date >= start_date,
-            TimeEntry.date <= end_date
+            TimeEntry.date <= end_date,
+            TimeEntry.user_id == current_user.id
         )
     ).order_by(TimeEntry.date.desc(), TimeEntry.created_at.desc()).limit(10).all()
     
@@ -105,7 +109,8 @@ def dashboard():
     ).filter(
         and_(
             TimeEntry.date >= start_date,
-            TimeEntry.date <= end_date
+            TimeEntry.date <= end_date,
+            TimeEntry.user_id == current_user.id
         )
     ).group_by(TimeEntry.date).order_by(TimeEntry.date.desc()).all()
     
@@ -183,8 +188,15 @@ def entries(cycle_date=None):
                 start_date, end_date, cycle_name = cycle_data
 
         # Build query
+        current_user = get_current_user()
+        if not current_user:
+            return redirect(url_for('login'))
+            
         query = TimeEntry.query.filter(
-            TimeEntry.date.between(start_date, end_date)
+            and_(
+                TimeEntry.date.between(start_date, end_date),
+                TimeEntry.user_id == current_user.id
+            )
         ).order_by(TimeEntry.date.desc(), TimeEntry.created_at.desc())
         
         # Apply project filter if specified
