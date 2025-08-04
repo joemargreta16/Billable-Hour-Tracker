@@ -1113,7 +1113,7 @@ def admin_delete_user(user_id):
         db.session.rollback()
         flash(f'Error deleting user: {str(e)}', 'error')
     
-    return redirect(url_for('admin_users))
+    return redirect(url_for('admin_users'))
 
 @app.route('/admin/dashboard')
 @admin_required
