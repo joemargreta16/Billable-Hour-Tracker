@@ -63,17 +63,20 @@ def login():
         flash('Invalid username or password.')
     return render_template('login.html')
 
-@app.route('/dashboard')
-def dashboard():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    return render_template('dashboard.html', username=session.get('username'))
+# Removed duplicate dashboard and logout routes from app.py to avoid endpoint conflicts
+# These routes are defined in routes.py
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    flash('Logged out successfully.')
-    return redirect(url_for('login'))
+# @app.route('/dashboard')
+# def dashboard():
+#     if 'user_id' not in session:
+#         return redirect(url_for('login'))
+#     return render_template('dashboard.html', username=session.get('username'))
+
+# @app.route('/logout')
+# def logout():
+#     session.clear()
+#     flash('Logged out successfully.')
+#     return redirect(url_for('login'))
 
 # @app.route('/drop_user_table')
 # def drop_user_table():
