@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Edit User - Admin - Time Tracker{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Edit User</h1>
+    <form method="POST" action="{{ url_for('admin_edit_user', user_id=user.id) }}">
+        <div class="mb-3">
+            <label for="username" class="form-label">Username</label>
+            <input type="text" class="form-control" id="username" name="username" value="{{ user.username }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">New Password (leave blank to keep current)</label>
+            <input type="password" class="form-control" id="password" name="password" placeholder="Leave blank to keep current">
+        </div>
+        <div class="mb-3">
+            <label for="is_admin" class="form-label">Admin Status</label>
+            <select class="form-select" id="is_admin" name="is_admin">
+                <option value="False" {% if not user.is_admin %}selected{% endif %}>User</option>
+                <option value="True" {% if user.is_admin %}selected{% endif %}>Admin</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Update User</button>
+        <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

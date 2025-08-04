@@ -1017,6 +1017,128 @@ def add_project_page():
     
     return render_template('add_project.html')
 
+# Admin Routes
+@app.route('/admin/users')
+@admin_required
+def admin_users():
+    """Admin page to manage users"""
+    users = User.query.all()
+    return render_template('admin/users.html', users=users)
+
+@app.route('/admin/users/create', methods=['GET', 'POST'])
+@admin_required
+def admin_create_user():
+    """Create a new user (admin only)"""
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        is_admin = request.form.get('is_admin') == 'on'
+        
+        if not username or not password:
+            flash('Username and password are required', 'error')
+            return redirect(url_for('admin_create_user'))
+        
+        # Check if user already exists
+        existing_user = User.query.filter_by(username=username).first()
+        if existing_user:
+            flash('Username already exists', 'error')
+            return redirect(url_for('admin_create_user'))
+        
+        try:
+            new_user = User(username=username, is_admin=is_admin)
+            new_user.set_password(password)
+            db.session.add(new_user)
+            db.session.commit()
+            flash('User created successfully!', 'success')
+            return redirect(url_for('admin_users'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating user: {str(e)}', 'error')
+            return redirect(url_for('admin_create_user'))
+    
+    return render_template('admin/create_user.html')
+
+@app.route('/admin/users/<int:user_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_edit_user(user_id):
+    """Edit user details (admin only)"""
+    user = User.query.get_or_404(user_id)
+    
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        is_admin = request.form.get('is_admin') == 'on'
+        
+        if not username:
+            flash('Username is required', 'error')
+            return redirect(url_for('admin_edit_user', user_id=user_id))
+        
+        # Check if username already exists (excluding current user)
+        existing_user = User.query.filter(User.username == username, User.id != user_id).first()
+        if existing_user:
+            flash('Username already exists', 'error')
+            return redirect(url_for('admin_edit_user', user_id=user_id))
+        
+        try:
+            user.username = username
+            user.is_admin = is_admin
+            if password:
+                user.set_password(password)
+            db.session.commit()
+            flash('User updated successfully!', 'success')
+            return redirect(url_for('admin_users'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating user: {str(e)}', 'error')
+            return redirect(url_for('admin_edit_user', user_id=user_id))
+    
+    return render_template('admin/edit_user.html', user=user)
+
+@app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_user(user_id):
+    """Delete user (admin only)"""
+    user = User.query.get_or_404(user_id)
+    
+    # Prevent deleting the last admin
+    if user.is_admin and User.query.filter_by(is_admin=True).count() <= 1:
+        flash('Cannot delete the last admin user', 'error')
+        return redirect(url_for('admin_users'))
+    
+    try:
+        db.session.delete(user)
+        db.session.commit()
+        flash('User deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting user: {str(e)}', 'error')
+    
+    return redirect(url_for('admin_users))
+
+@app.route('/admin/dashboard')
+@admin_required
+def admin_dashboard():
+    """Admin dashboard with statistics"""
+    # Get user statistics
+    total_users = User.query.count()
+    admin_users = User.query.filter_by(is_admin=True).count()
+    regular_users = total_users - admin_users
+    
+    # Get time entry statistics
+    total_entries = TimeEntry.query.count()
+    total_projects = Project.query.count()
+    
+    # Get recent users
+    recent_users = User.query.order_by(User.id.desc()).limit(5).all()
+    
+    return render_template('admin/dashboard.html',
+                         total_users=total_users,
+                         admin_users=admin_users,
+                         regular_users=regular_users,
+                         total_entries=total_entries,
+                         total_projects=total_projects,
+                         recent_users=recent_users)
+
 @app.route('/api/cycle_stats/<cycle_date>')
 @login_required
 def api_cycle_stats(cycle_date):
