@@ -1,6 +1,7 @@
 from app import db
 from datetime import datetime, date
 from sqlalchemy import func
+from werkzeug.security import generate_password_hash, check_password_hash
 
 class Project(db.Model):
     """Model for storing project information"""
@@ -136,3 +137,21 @@ def set_setting(key, value):
         db.session.rollback()
         print(f"Error setting {key}: {e}")
         return False
+
+class User(db.Model):
+    """Model for storing user authentication information"""
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    is_admin = db.Column(db.Boolean, nullable=False, default=False)
+    
+    def set_password(self, password):
+        """Hash and set the user's password"""
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Check if the provided password matches the hash"""
+        return check_password_hash(self.password_hash, password)
+    
+    def __repr__(self):
+        return f'<User {self.username}>'
