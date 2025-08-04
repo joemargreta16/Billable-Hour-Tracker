@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
@@ -12,9 +12,6 @@ db = SQLAlchemy(app)
 
 # Import User model after db is initialized to avoid circular imports
 from models import User
-
-# Import routes to register all routes with the app
-import routes
 
 # Create tables at startup (Flask 3+ compatible)
 with app.app_context():
