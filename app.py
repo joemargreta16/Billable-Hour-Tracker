@@ -1,23 +1,21 @@
 import os
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your_secret_key')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///users.db')
+import os
+
+db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'instance', 'timetracker.db'))
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', f'sqlite:///{db_path}')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
-    is_admin = db.Column(db.Boolean, nullable=False, default=False)
 
 # Create tables at startup (Flask 3+ compatible)
 with app.app_context():
     db.create_all()
+    # Import User model after db is initialized to avoid circular imports
+    from models import User
 
 @app.route('/')
 def home():
@@ -27,6 +25,8 @@ def home():
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
+    # Import User model within app context to avoid circular imports
+    from models import User
     if request.method == 'POST':
         try:
             username = request.form['username'].strip()
@@ -37,8 +37,8 @@ def signup():
             if User.query.filter_by(username=username).first():
                 flash('Username already exists.')
                 return render_template('signup.html')
-            hashed_pw = generate_password_hash(password)
-            new_user = User(username=username, password_hash=hashed_pw, is_admin=False)
+            new_user = User(username=username, is_admin=False)
+            new_user.set_password(password)
             db.session.add(new_user)
             db.session.commit()
             flash('Signup successful. Please log in.')
@@ -51,11 +51,13 @@ def signup():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # Import User model within app context to avoid circular imports
+    from models import User
     if request.method == 'POST':
         username = request.form['username'].strip()
         password = request.form['password']
         user = User.query.filter_by(username=username).first()
-        if user and check_password_hash(user.password_hash, password):
+        if user and user.check_password(password):
             session['user_id'] = user.id
             session['username'] = user.username
             return redirect(url_for('dashboard'))
