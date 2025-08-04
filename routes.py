@@ -74,15 +74,15 @@ def dashboard():
     # Get monthly goal
     monthly_goal = float(get_setting('monthly_goal_hours', '160'))
     
-        # Calculate total billable hours for current cycle
-        current_user = get_current_user()
-        total_hours = db.session.query(func.sum(TimeEntry.hours)).filter(
-            and_(
-                TimeEntry.date >= start_date,
-                TimeEntry.date <= end_date,
-                TimeEntry.user_id == current_user.id
-            )
-        ).scalar() or 0.0
+    # Calculate total billable hours for current cycle
+    current_user = get_current_user()
+    total_hours = db.session.query(func.sum(TimeEntry.hours)).filter(
+        and_(
+            TimeEntry.date >= start_date,
+            TimeEntry.date <= end_date,
+            TimeEntry.user_id == current_user.id
+        )
+    ).scalar() or 0.0
     
     # Calculate remaining hours
     remaining_hours = max(0, monthly_goal - total_hours)
