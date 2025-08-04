@@ -54,7 +54,15 @@ def get_current_user():
         return None
     return User.query.filter_by(username=session['username']).first()
 
+def require_login():
+    """Check if user is logged in, redirect to login if not"""
+    if 'username' not in session:
+        flash('Please login to access this page', 'error')
+        return redirect(url_for('login'))
+    return None
+
 @app.route('/')
+@login_required
 def dashboard():
     """Main dashboard showing current cycle statistics with date range filter"""
     start_date_str = request.args.get('start_date')
@@ -143,6 +151,7 @@ def dashboard():
 
 @app.route('/entries')
 @app.route('/entries/<cycle_date>')
+@login_required
 def entries(cycle_date=None):
     """View all entries with filters for cycle, week, and project"""
     try:
@@ -248,6 +257,7 @@ def entries(cycle_date=None):
 
 
 @app.route('/add_entry', methods=['GET', 'POST'])
+@login_required
 def add_entry():
     """Add a new time entry"""
     stay_on_page = request.args.get('stay', 'false').lower() == 'true'
@@ -315,6 +325,7 @@ def add_entry():
                          default_date=default_date)
 
 @app.route('/edit_entry/<int:entry_id>', methods=['GET', 'POST'])
+@login_required
 def edit_entry(entry_id):
     """Edit an existing time entry"""
     entry = TimeEntry.query.get_or_404(entry_id)
@@ -377,6 +388,7 @@ def edit_entry(entry_id):
                          decimal_to_hours_minutes=decimal_to_hours_minutes)
 
 @app.route('/delete_entry/<int:entry_id>', methods=['POST'])
+@login_required
 def delete_entry(entry_id):
     """Delete a time entry"""
     entry = TimeEntry.query.get_or_404(entry_id)
@@ -392,6 +404,7 @@ def delete_entry(entry_id):
     return redirect(url_for('entries'))
 
 @app.route('/settings', methods=['GET', 'POST'])
+@login_required
 def settings():
     """Application settings page"""
     if request.method == 'POST':
@@ -422,6 +435,7 @@ def settings():
                          projects=projects)
 
 @app.route('/toggle_project/<int:project_id>', methods=['POST'])
+@login_required
 def toggle_project(project_id):
     """Toggle project active status"""
     project = Project.query.get_or_404(project_id)
@@ -438,6 +452,7 @@ def toggle_project(project_id):
     return redirect(url_for('settings'))
 
 @app.route('/add_project', methods=['POST'])
+@login_required
 def add_project():
     """Add a new project"""
     name = request.form.get('name', '').strip()
@@ -467,6 +482,7 @@ def add_project():
     return redirect(url_for('settings'))
 
 @app.route('/delete_project/<int:project_id>', methods=['POST'])
+@login_required
 def delete_project(project_id):
     """Delete a project and its associated time entries"""
     project = Project.query.get_or_404(project_id)
@@ -513,6 +529,7 @@ def edit_project(project_id):
     return redirect(url_for('settings'))
 
 @app.route('/export')
+@login_required
 def export_page():
     """Export data page"""
     # Get all projects for filter
@@ -531,6 +548,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 
 @app.route('/export_data', methods=['GET', 'POST'])
+@login_required
 def export_data():
     """Export time tracking data to CSV or PDF"""
     
@@ -755,6 +773,7 @@ def export_data():
         return response
 
 @app.route('/search')
+@login_required
 def search_entries():
     """Search and filter time entries"""
     query_text = request.args.get('q', '').strip()
@@ -817,6 +836,7 @@ def search_entries():
                          decimal_to_hours_minutes=decimal_to_hours_minutes)
 
 @app.route('/reports')
+@login_required
 def reports():
     """Advanced reports and analytics"""
     start_date_str = request.args.get('start_date')
@@ -923,12 +943,14 @@ def reports():
                          decimal_to_hours_minutes=decimal_to_hours_minutes)
 
 @app.route('/projects')
+@login_required
 def projects():
     """List all projects for management"""
     projects = Project.query.order_by(Project.created_at.desc()).all()
     return render_template('projects.html', projects=projects)
 
 @app.route('/project/edit/<int:project_id>', methods=['GET', 'POST'])
+@login_required
 def edit_project_page(project_id):
     """Render and process editing a project"""
     project = Project.query.get_or_404(project_id)
@@ -996,6 +1018,7 @@ def add_project_page():
     return render_template('add_project.html')
 
 @app.route('/api/cycle_stats/<cycle_date>')
+@login_required
 def api_cycle_stats(cycle_date):
     """API endpoint to get cycle statistics"""
     try:
